@@ -35,7 +35,10 @@ Node.js 24 or later can use a filesystem path or `file://` URL for
 `memory://` for temporary storage. Only one connection may open a given
 persistent data directory at a time. The browser implementation is
 also available explicitly as `MySQLWorker` from `mysql-wasm/worker`.
-In Node, that export uses the same child-process implementation.
+In Node, that export runs the server inside the current process, on
+worker threads, with the same `dataDir` options. It avoids the child
+process, but a crash in the server takes the host process down with it.
+Both implementations can open each other's data directories.
 
 ## Browser setup
 

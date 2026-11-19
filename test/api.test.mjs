@@ -98,3 +98,26 @@ test('MySQL uses native parameters, executes scripts and persists InnoDB rows', 
     await rm(dataDir, { recursive: true, force: true });
   }
 });
+
+test('MySQLWorker runs in this process and shares data with MySQL', async () => {
+  const dataDir = await mkdtemp(join(tmpdir(), 'mysql-wasm-test-'));
+  let db;
+  try {
+    db = await MySQLWorker.create();
+    await db.exec('CREATE TABLE t (id INT PRIMARY KEY); INSERT INTO t VALUES (1), (2)');
+    assert.deepEqual((await db.query('SELECT COUNT(*) AS n FROM t')).rows, [{ n: 2 }]);
+    await db.close();
+
+    db = await MySQLWorker.create({ dataDir });
+    await assert.rejects(MySQLWorker.create({ dataDir }), /EEXIST/);
+    await db.transaction(tx => tx.query('CREATE TABLE t (id INT PRIMARY KEY, value TEXT)'));
+    await db.query('INSERT INTO t VALUES (?, ?)', [1, 'worker']);
+    await db.close();
+
+    db = await MySQL.create({ dataDir });
+    assert.deepEqual((await db.query('SELECT * FROM t')).rows, [{ id: 1, value: 'worker' }]);
+  } finally {
+    await db?.close();
+    await rm(dataDir, { recursive: true, force: true });
+  }
+});

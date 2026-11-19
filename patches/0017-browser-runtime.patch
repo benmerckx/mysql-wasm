@@ -7,9 +7,9 @@
 +  OPTION(MYSQL_WASM_BROWSER "Build the browser worker runtime" OFF)
 +  IF(MYSQL_WASM_BROWSER)
 +    TARGET_LINK_OPTIONS(mysqld PRIVATE
-+      -sENVIRONMENT=web,worker -sNODERAWFS=0 -sMODULARIZE=1 -sEXPORT_ES6=1
-+      -sEXPORTED_RUNTIME_METHODS=callMain,ccall,FS -sFORCE_FILESYSTEM=1
-+      -lidbfs.js)
++      -sENVIRONMENT=web,worker,node -sNODERAWFS=0 -sMODULARIZE=1 -sEXPORT_ES6=1
++      -sEXPORTED_RUNTIME_METHODS=callMain,ccall,FS,ENV -sFORCE_FILESYSTEM=1
++      -lidbfs.js -lnodefs.js)
 +  ELSE()
 +    TARGET_LINK_OPTIONS(mysqld PRIVATE -sENVIRONMENT=node -sNODERAWFS=1
 +      "SHELL:--pre-js ${CMAKE_CURRENT_SOURCE_DIR}/node-assets.js")

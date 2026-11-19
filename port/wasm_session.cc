@@ -2,6 +2,7 @@
 #include <emscripten.h>
 #include <chrono>
 #include <cstdio>
+#include <cstdlib>
 #include <condition_variable>
 #include <cstring>
 #include <mutex>
@@ -366,7 +367,8 @@ bool mysql_wasm_run_session() {
   std::string pending;
   char chunk[4096];
   int count;
-  auto read = mysql_wasm_node() ? mysql_wasm_read : +[](char *buffer, int size) { return read_mailbox(buffer, size); };
+  // The in-process Node runtime submits requests like the browser does.
+  auto read = mysql_wasm_node() && !getenv("MYSQL_WASM_MAILBOX") ? mysql_wasm_read : +[](char *buffer, int size) { return read_mailbox(buffer, size); };
   while ((count = read(chunk, sizeof(chunk))) != 0) {
     if (count == -2) {
       std::this_thread::sleep_for(std::chrono::milliseconds(5));

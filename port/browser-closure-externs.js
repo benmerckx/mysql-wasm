@@ -1,9 +1,6 @@
 /** @externs */
 
-// The shared Wasm imports a batch input function that uses require in Node.
-function require(name) {}
-
-// These properties are read by src/browser-worker.mjs outside Closure's input.
+// These properties are read by src/engine.mjs and its hosts outside Closure's input.
 /** @constructor */
 function MySQLWasmFileSystem() {}
 MySQLWasmFileSystem.prototype.mkdirTree = function(path) {};
@@ -15,7 +12,7 @@ MySQLWasmFileSystem.prototype.stat = function(path) {};
 MySQLWasmFileSystem.prototype.isDir = function(mode) {};
 MySQLWasmFileSystem.prototype.mount = function(type, options, path) {};
 MySQLWasmFileSystem.prototype.syncfs = function(populate, done) {};
-/** @type {{IDBFS: !Object}} */
+/** @type {{IDBFS: !Object, NODEFS: !Object}} */
 MySQLWasmFileSystem.prototype.filesystems;
 
 /** @constructor */
@@ -27,5 +24,7 @@ MySQLWasmFileStat.prototype.mode;
 function MySQLWasmRuntime() {}
 /** @type {!MySQLWasmFileSystem} */
 MySQLWasmRuntime.prototype.FS;
+/** @type {!Object<string, string>} */
+MySQLWasmRuntime.prototype.ENV;
 MySQLWasmRuntime.prototype.callMain = function(args) {};
 MySQLWasmRuntime.prototype.ccall = function(name, result, types, args) {};
