@@ -1,0 +1,2 @@
+set(UNIX TRUE)
+set(CMAKE_EXECUTABLE_SUFFIX ".wasm")

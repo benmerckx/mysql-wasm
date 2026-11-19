@@ -1,0 +1,4 @@
+[submodule "upstream/mysql-server"]
+	path = upstream/mysql-server
+	url = https://github.com/mysql/mysql-server.git
+	shallow = true

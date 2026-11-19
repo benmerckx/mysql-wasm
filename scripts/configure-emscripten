@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+root="$(cd "$(dirname "$0")/.." && pwd)"
+source_dir="$root/upstream/mysql-server"
+
+if [[ ! -f "$source_dir/CMakeLists.txt" ]]; then
+  echo 'Initialize MySQL with git submodule update --init first.' >&2
+  exit 1
+fi
+if ! command -v emcmake >/dev/null 2>&1; then
+  echo 'Activate the Emscripten SDK before running this probe.' >&2
+  exit 1
+fi
+
+exec emcmake cmake -S "$source_dir" -B "$root/build/emscripten" -G Ninja \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DCMAKE_C_FLAGS="-m64 -pthread" \
+  -DCMAKE_CXX_FLAGS="-m64 -pthread" \
+  -DWITH_ROUTER=OFF \
+  -DWITH_UNIT_TESTS=OFF \
+  "$@"
