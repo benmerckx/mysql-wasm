@@ -1,0 +1,77 @@
+--- a/scripts/CMakeLists.txt
++++ b/scripts/CMakeLists.txt
+@@ -83,26 +83,44 @@
+   DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/mysql_fix_privilege_tables_sql.h
+ )
+ 
++# Keep compact bootstrap inputs separate from the upstream SQL files.
++FOREACH(system_data mysql_system_tables_data mysql_system_tables_data_fix)
++  SET(${system_data}_sql "${CMAKE_CURRENT_SOURCE_DIR}/${system_data}.sql")
++  IF(EMSCRIPTEN)
++    FIND_PACKAGE(Perl REQUIRED)
++    SET(filter_srs "${CMAKE_CURRENT_SOURCE_DIR}/mysql_wasm_filter_srs.pl")
++    SET(compact_sql "${CMAKE_CURRENT_BINARY_DIR}/${system_data}.sql")
++    ADD_CUSTOM_COMMAND(
++      OUTPUT "${compact_sql}"
++      COMMAND "${PERL_EXECUTABLE}" "${filter_srs}"
++              "${${system_data}_sql}" "${compact_sql}"
++      DEPENDS "${filter_srs}" "${${system_data}_sql}"
++      VERBATIM
++    )
++    SET(${system_data}_sql "${compact_sql}")
++  ENDIF()
++ENDFOREACH()
++
+ ADD_CUSTOM_COMMAND(
+   OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/sql_commands_system_data.h
+   COMMAND ${COMP_SQL_COMMAND}
+   mysql_system_data
+-  ${CMAKE_CURRENT_SOURCE_DIR}/mysql_system_tables_data.sql
++  "${mysql_system_tables_data_sql}"
+   sql_commands_system_data.h
+   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+   DEPENDS ${COMP_SQL_COMMAND}
+-  ${CMAKE_CURRENT_SOURCE_DIR}/mysql_system_tables_data.sql
++  "${mysql_system_tables_data_sql}"
+ )
+ 
+ ADD_CUSTOM_COMMAND(
+   OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/sql_commands_system_tables_data_fix.h
+   COMMAND ${COMP_SQL_COMMAND}
+   mysql_system_tables_data_fix
+-  ${CMAKE_CURRENT_SOURCE_DIR}/mysql_system_tables_data_fix.sql
++  "${mysql_system_tables_data_fix_sql}"
+   sql_commands_system_tables_data_fix.h
+   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+   DEPENDS ${COMP_SQL_COMMAND}
+-  ${CMAKE_CURRENT_SOURCE_DIR}/mysql_system_tables_data_fix.sql
++  "${mysql_system_tables_data_fix_sql}"
+ )
+ 
+ ADD_CUSTOM_COMMAND(
+--- /dev/null
++++ b/scripts/mysql_wasm_filter_srs.pl
+@@ -0,0 +1,23 @@
++use strict;
++use warnings;
++
++my ($input, $output) = @ARGV;
++open my $source, '<:raw', $input or die "Cannot read $input: $!";
++my %retained = map { $_ => 0 } (3857, 4326);
++my @sql;
++while (my $line = <$source>) {
++    if ($line =~ /^REPLACE INTO mysql\.st_spatial_reference_systems\(/) {
++        $line =~ /\) VALUES \((\d+),.*;\s*$/ or die "Unexpected spatial reference row in $input";
++        my $id = $1;
++        next unless exists $retained{$id};
++        $retained{$id}++;
++    }
++    push @sql, $line;
++}
++for my $id (sort keys %retained) {
++    die "Expected one row for SRID $id in $input" unless $retained{$id} == 1;
++}
++
++open my $target, '>:raw', $output or die "Cannot write $output: $!";
++print {$target} @sql or die "Cannot write $output: $!";
++close $target or die "Cannot finish writing $output: $!";

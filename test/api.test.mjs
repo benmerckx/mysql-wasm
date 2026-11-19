@@ -43,6 +43,16 @@ test('MySQL uses native parameters, executes scripts and persists InnoDB rows', 
       "SELECT CAST(_latin1 0xe9 AS CHAR CHARACTER SET latin1) AS word, CAST(1.40 AS DECIMAL(4,2)) AS exact, JSON_OBJECT('key',42) AS j",
     );
     assert.deepEqual(types.rows, [{ word: 'é', exact: '1.40', j: { key: 42 } }]);
+    const references = await db.query(
+      'SELECT SRS_ID AS id FROM information_schema.ST_SPATIAL_REFERENCE_SYSTEMS ORDER BY SRS_ID',
+    );
+    assert.deepEqual(references.rows, [{ id: 0 }, { id: 3857 }, { id: 4326 }]);
+    await db.exec(
+      'CREATE TABLE places (id INT PRIMARY KEY, geom POINT NOT NULL SRID 0, SPATIAL INDEX(geom)) ENGINE=InnoDB; INSERT INTO places VALUES (1, POINT(1, 2));',
+    );
+    assert.deepEqual((await db.query('SELECT id FROM places WHERE geom IS NOT NULL')).rows, [{ id: 1 }]);
+    await assert.rejects(db.query('SELECT ST_DISTANCE(POINT(0, 0), POINT(1, 1))'), { errno: 1305 });
+    await assert.rejects(db.query('SELECT MBRCONTAINS(POINT(0, 0), POINT(1, 1))'), { errno: 1305 });
     const persist = db.persist();
     await Promise.all([persist, db.close()]);
 
