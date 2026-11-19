@@ -68,6 +68,9 @@ skip the bundled `sys` schema, whose diagnostic views depend on Performance
 Schema. `SHOW VARIABLES` and `SHOW STATUS` also use Performance Schema in
 MySQL 8.4 and return an error in this build.
 
+The Archive, Blackhole, and Federated storage engines are omitted, along with
+the ngram full-text parser and the legacy `mysql_native_password` plugin.
+
 The `ST_*` spatial functions and `MBR*` predicates are omitted. Geometry
 columns, spatial indexes, and constructors such as `POINT(x, y)` are
 available. New databases include spatial reference IDs 0, 3857, and 4326.
