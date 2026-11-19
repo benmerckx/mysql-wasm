@@ -1,0 +1,12 @@
+brkitr/burmesedict.dict
+brkitr/char.brk
+brkitr/cjdict.dict
+brkitr/en.res
+brkitr/khmerdict.dict
+brkitr/laodict.dict
+brkitr/root.res
+brkitr/thaidict.dict
+brkitr/word.brk
+uemoji.icu
+ulayout.icu
+unames.icu

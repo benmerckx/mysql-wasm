@@ -22,7 +22,13 @@ cp "$build_dir/runtime_output_directory/mysqld.wasm" "$dist/"
 printf '{"type":"commonjs"}\n' > "$dist/runtime_output_directory/package.json"
 cp "$build_dir/share/english/errmsg.sys" "$dist/share/english/"
 cp -R "$source_dir/share/charsets" "$dist/share/"
-cp -R "$source_dir/extra/icu/icudt77l" "$dist/lib/private/"
+# Stage the ICU resources opened by the regex engine.
+icu_dir="$dist/lib/private/icudt77l"
+rm -rf -- "$icu_dir"
+while IFS= read -r file; do
+  mkdir -p "$(dirname "$icu_dir/$file")"
+  cp "$source_dir/extra/icu/icudt77l/$file" "$icu_dir/$file"
+done < "$root/scripts/icu-regex-assets.txt"
 node "$root/scripts/pack-assets.mjs" "$dist" "$source_dir" "$build_dir"
 
 mkdir -p "$dist/licenses"

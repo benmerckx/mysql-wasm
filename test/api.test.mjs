@@ -43,6 +43,33 @@ test('MySQL uses native parameters, executes scripts and persists InnoDB rows', 
       String.raw`\N{GREEK SMALL LETTER ALPHA}`,
     ]);
     assert.deepEqual(namedCharacter.rows, [{ matched: 1 }]);
+    const regex = await db.query(
+      `SELECT REGEXP_LIKE(?, ?, 'i') AS case_folded,
+              REGEXP_LIKE(?, ?) AS word_boundary,
+              REGEXP_LIKE(?, ?) AS dictionary_boundary,
+              REGEXP_REPLACE(?, ?, ?) AS replaced,
+              REGEXP_SUBSTR(?, ?) AS grapheme,
+              REGEXP_INSTR(?, ?) AS position,
+              REGEXP_LIKE(?, ?) AS unicode_property`,
+      [
+        'ΚαληΜΈΡΑ', '^καλημέρα$',
+        '!猫!', String.raw`\b猫\b`,
+        'ภาษาไทย', String.raw`(?w)\bไทย\b`,
+        '東京-42', String.raw`\p{Nd}+`, '数',
+        '👩🏽‍💻x', String.raw`^\X`,
+        'é猫x', '猫',
+        'क', String.raw`^\p{Indic_Syllabic_Category=Consonant}$`,
+      ],
+    );
+    assert.deepEqual(regex.rows, [{
+      case_folded: 1,
+      word_boundary: 1,
+      dictionary_boundary: 1,
+      replaced: '東京-数',
+      grapheme: '👩🏽‍💻',
+      position: 2,
+      unicode_property: 1,
+    }]);
     assert.deepEqual((await db.query('SELECT CONVERT(_greek 0xE1 USING utf8mb4) AS word')).rows, [{ word: 'α' }]);
     const types = await db.query(
       "SELECT CAST(_latin1 0xe9 AS CHAR CHARACTER SET latin1) AS word, CAST(1.40 AS DECIMAL(4,2)) AS exact, JSON_OBJECT('key',42) AS j",

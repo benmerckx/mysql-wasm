@@ -24,7 +24,7 @@ async function addDirectory(path, name) {
 
 await addFile(join(build, 'share/english/errmsg.sys'), 'share/english/errmsg.sys');
 await addDirectory(join(source, 'share/charsets'), 'share/charsets');
-await addDirectory(join(source, 'extra/icu/icudt77l'), 'lib/private/icudt77l');
+await addDirectory(join(dist, 'lib/private/icudt77l'), 'lib/private/icudt77l');
 
 const manifest = Buffer.from(JSON.stringify(index));
 const header = Buffer.alloc(4);

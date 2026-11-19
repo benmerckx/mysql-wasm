@@ -58,6 +58,10 @@ The build retains common utf8mb4 collations and the charset tables required
 by the server and ICU. It omits many legacy and language-specific compiled
 collations, the bundled SQL HELP text, MySQL X Plugin, NDB, and Group
 Replication. Check schemas for explicit collation names before importing.
+The ICU bundle includes the data used by regular expressions, including
+named characters (`\N{name}`), grapheme clusters (`\X`), and dictionary
+segmentation for Unicode word boundaries (`(?w)\b`). It omits ICU line,
+sentence, and title break rules and locale overrides unused by the regex engine.
 The `ST_*` spatial functions and `MBR*` predicates are omitted. Geometry
 columns, spatial indexes, and constructors such as `POINT(x, y)` are
 available. New databases include spatial reference IDs 0, 3857, and 4326.
