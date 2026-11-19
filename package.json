@@ -32,7 +32,8 @@
   ],
   "scripts": {
     "test": "node --test test/*.test.mjs",
-    "prepack": "node scripts/check-package.mjs"
+    "prepack": "node scripts/check-package.mjs",
+    "bench": "node bench/node.mjs"
   },
   "engines": {
     "node": ">=24"
@@ -41,5 +42,8 @@
     "type": "git",
     "url": "git+https://github.com/benmerckx/mysql-wasm.git"
   },
-  "license": "GPL-2.0-only"
+  "license": "GPL-2.0-only",
+  "devDependencies": {
+    "@electric-sql/pglite": "0.5.17"
+  }
 }

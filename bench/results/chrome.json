@@ -1,0 +1,144 @@
+{
+  "chrome": "157.0.8103.79",
+  "trials": 5,
+  "results": {
+    "mysql": {
+      "cold": {
+        "median": 3247.9650000035763,
+        "min": 2319.824999988079,
+        "max": 3543.8250000178814,
+        "samples": [
+          3543.8250000178814,
+          3247.9650000035763,
+          3351.699999988079,
+          3233.390000015497,
+          2319.824999988079
+        ]
+      },
+      "single": {
+        "median": 229.69999998807907,
+        "min": 192.08500000834465,
+        "max": 249.29499998688698,
+        "samples": [
+          249.29499998688698,
+          198.12000000476837,
+          229.69999998807907,
+          192.08500000834465,
+          236
+        ]
+      }
+    },
+    "pglite": {
+      "cold": {
+        "median": 969.7350000143051,
+        "min": 948.7700000107288,
+        "max": 1064.7350000143051,
+        "samples": [
+          948.7700000107288,
+          1064.7350000143051,
+          969.7350000143051,
+          950.0900000035763,
+          1032.5999999940395
+        ]
+      },
+      "single": {
+        "median": 86.6700000166893,
+        "min": 79.32499998807907,
+        "max": 93.04499998688698,
+        "samples": [
+          92.99500000476837,
+          86.6700000166893,
+          82.61999997496605,
+          79.32499998807907,
+          93.04499998688698
+        ]
+      }
+    }
+  },
+  "downloads": {
+    "mysql": {
+      "/dist/assets.data": {
+        "raw": 4022512,
+        "brotli": 2267109
+      },
+      "/dist/browser/mysqld.js": {
+        "raw": 68158,
+        "brotli": 21889
+      },
+      "/dist/mysqld.wasm": {
+        "raw": 17275783,
+        "brotli": 4475927
+      },
+      "/src/assets.mjs": {
+        "raw": 1146,
+        "brotli": 475
+      },
+      "/src/browser-worker.mjs": {
+        "raw": 6237,
+        "brotli": 1922
+      },
+      "/src/browser.mjs": {
+        "raw": 2158,
+        "brotli": 708
+      },
+      "/src/connection.mjs": {
+        "raw": 2972,
+        "brotli": 785
+      },
+      "/src/protocol.mjs": {
+        "raw": 3079,
+        "brotli": 1038
+      }
+    },
+    "pglite": {
+      "/pglite/chunk-BD5WXLQO.js": {
+        "raw": 2261,
+        "brotli": 954
+      },
+      "/pglite/chunk-CTPU3OXM.js": {
+        "raw": 375919,
+        "brotli": 70389
+      },
+      "/pglite/chunk-KLBW4PNS.js": {
+        "raw": 1017,
+        "brotli": 473
+      },
+      "/pglite/chunk-N66TTF7B.js": {
+        "raw": 99538,
+        "brotli": 28911
+      },
+      "/pglite/chunk-UYHX356B.js": {
+        "raw": 4625,
+        "brotli": 1471
+      },
+      "/pglite/chunk-VQDTEBLE.js": {
+        "raw": 917,
+        "brotli": 504
+      },
+      "/pglite/chunk-Y6PULSM7.js": {
+        "raw": 18697,
+        "brotli": 5823
+      },
+      "/pglite/chunk-ZSOCVAT7.js": {
+        "raw": 1335,
+        "brotli": 632
+      },
+      "/pglite/index.js": {
+        "raw": 520,
+        "brotli": 268
+      },
+      "/pglite/initdb.wasm": {
+        "raw": 298788,
+        "brotli": 108282
+      },
+      "/pglite/pglite.data": {
+        "raw": 6241295,
+        "brotli": 1059663
+      },
+      "/pglite/pglite.wasm": {
+        "raw": 9118807,
+        "brotli": 2560378
+      }
+    }
+  }
+}
