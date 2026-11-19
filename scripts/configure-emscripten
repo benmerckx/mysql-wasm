@@ -2,21 +2,39 @@
 set -euo pipefail
 
 root="$(cd "$(dirname "$0")/.." && pwd)"
-source_dir="$root/upstream/mysql-server"
-
-if [[ ! -f "$source_dir/CMakeLists.txt" ]]; then
-  echo 'Initialize MySQL with git submodule update --init first.' >&2
-  exit 1
-fi
 if ! command -v emcmake >/dev/null 2>&1; then
   echo 'Activate the Emscripten SDK before running this probe.' >&2
   exit 1
 fi
 
-exec emcmake cmake -S "$source_dir" -B "$root/build/emscripten" -G Ninja \
+ssl="${OPENSSL_WASM64_ROOT:-$root/build/openssl-wasm64}"
+comp_err="${MYSQL_WASM_COMP_ERR:-$root/build/native/runtime_output_directory/comp_err}"
+if [[ ! -f "$ssl/lib/libssl.a" || ! -f "$ssl/lib/libcrypto.a" || ! -x "$comp_err" ||
+      ! -x "$(dirname "$comp_err")/uca9dump" ||
+      ! -x "$(dirname "$comp_err")/comp_sql" ]]; then
+  echo 'Build target OpenSSL and the native generators with ./scripts/build-dependencies.' >&2
+  exit 1
+fi
+
+source_dir="$("$root/scripts/prepare-source")"
+build_dir="$root/build/emscripten/$(basename "$source_dir")"
+exec emcmake cmake -S "$source_dir" -B "$build_dir" -G Ninja \
   -DCMAKE_BUILD_TYPE=Release \
   -DCMAKE_C_FLAGS="-m64 -pthread" \
-  -DCMAKE_CXX_FLAGS="-m64 -pthread" \
+  -DCMAKE_CXX_FLAGS="-m64 -pthread -fwasm-exceptions" \
+  -DCMAKE_C_FLAGS_RELEASE="-O1 -DNDEBUG" \
+  -DCMAKE_CXX_FLAGS_RELEASE="-O1 -DNDEBUG" \
+  -DMYSQL_WASM_COMP_ERR="$comp_err" \
+  -DWITH_SSL="$ssl" \
+  -DOPENSSL_ROOT_DIR="$ssl" \
+  -DOPENSSL_INCLUDE_DIR="$ssl/include" \
+  -DOPENSSL_LIBRARY="$ssl/lib/libssl.a" \
+  -DCRYPTO_LIBRARY="$ssl/lib/libcrypto.a" \
+  -DCMAKE_EXE_LINKER_FLAGS="-sNODERAWFS=1 -sALLOW_MEMORY_GROWTH=1" \
+  -Dprotobuf_BUILD_SHARED_LIBS=OFF \
+  -DWITH_NDBCLUSTER_STORAGE_ENGINE=OFF \
+  -DWITH_MYSQLX=OFF \
+  -DWITHOUT_GROUP_REPLICATION=ON \
   -DWITH_ROUTER=OFF \
   -DWITH_UNIT_TESTS=OFF \
   "$@"

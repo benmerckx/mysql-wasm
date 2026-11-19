@@ -1,0 +1,22 @@
+--- a/sql/set_var.cc
++++ b/sql/set_var.cc
+@@ -481,7 +481,7 @@
+ void sys_var::do_deprecated_warning(THD *thd) {
+   if (deprecation_substitute != nullptr) {
+     char buf1[NAME_CHAR_LEN + 3];
+-    strxnmov(buf1, sizeof(buf1) - 1, "@@", name.str, 0);
++    strxnmov(buf1, sizeof(buf1) - 1, "@@", name.str, static_cast<char *>(nullptr));
+ 
+     /*
+        if deprecation_substitute is an empty string,
+--- a/sql/sql_initialize.cc
++++ b/sql/sql_initialize.cc
+@@ -262,7 +262,7 @@
+              ER_INIT_DATADIR_EXISTS_AND_PATH_TOO_LONG_WONT_INITIALIZE);
+       return true; /* purecov: inspected */
+     }
+-    if (-1 != (fd = my_create(path, 0, flags, MYF(MY_WME)))) {
++    if (-1 != (fd = my_create(path, flags, O_WRONLY, MYF(MY_WME)))) {
+       my_close(fd, MYF(MY_WME));
+       my_delete(path, MYF(MY_WME));
+     } else {

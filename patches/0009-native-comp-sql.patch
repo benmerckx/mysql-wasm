@@ -1,0 +1,222 @@
+--- a/scripts/CMakeLists.txt
++++ b/scripts/CMakeLists.txt
+@@ -23,9 +23,18 @@
+ 
+ DISABLE_MISSING_PROFILE_WARNING()
+ 
++IF(EMSCRIPTEN)
++  GET_FILENAME_COMPONENT(MYSQL_WASM_HOST_BIN "${MYSQL_WASM_COMP_ERR}" DIRECTORY)
++  SET(COMP_SQL_COMMAND "${MYSQL_WASM_HOST_BIN}/comp_sql")
++  IF(NOT EXISTS "${COMP_SQL_COMMAND}")
++    MESSAGE(FATAL_ERROR "Build the native comp_sql next to comp_err.")
++  ENDIF()
++ELSE()
++  MYSQL_ADD_EXECUTABLE(comp_sql comp_sql.cc SKIP_INSTALL)
++  SET(COMP_SQL_COMMAND ${COMP_SQL_COMMAND})
++ENDIF()
++
+ ADD_SUBDIRECTORY(sys_schema)
+-
+-MYSQL_ADD_EXECUTABLE(comp_sql comp_sql.cc SKIP_INSTALL)
+ 
+ # Add compiler information, for easier debugging of output from mysql_config.
+ SET(COMPILER_ID_AND_VERSION
+@@ -58,12 +67,12 @@
+ ADD_CUSTOM_COMMAND(
+   OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/mysql_fix_privilege_tables_sql.h
+   ${CAT_COMMAND}
+-  COMMAND comp_sql
++  COMMAND ${COMP_SQL_COMMAND}
+   mysql_fix_privilege_tables
+   mysql_fix_privilege_tables.sql
+   mysql_fix_privilege_tables_sql.h
+   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+-  DEPENDS comp_sql
++  DEPENDS ${COMP_SQL_COMMAND}
+   ${CMAKE_CURRENT_SOURCE_DIR}/mysql_system_tables.sql
+   ${CMAKE_CURRENT_SOURCE_DIR}/mysql_system_tables_fix.sql
+ )
+@@ -76,133 +85,133 @@
+ 
+ ADD_CUSTOM_COMMAND(
+   OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/sql_commands_system_data.h
+-  COMMAND comp_sql
++  COMMAND ${COMP_SQL_COMMAND}
+   mysql_system_data
+   ${CMAKE_CURRENT_SOURCE_DIR}/mysql_system_tables_data.sql
+   sql_commands_system_data.h
+   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+-  DEPENDS comp_sql
++  DEPENDS ${COMP_SQL_COMMAND}
+   ${CMAKE_CURRENT_SOURCE_DIR}/mysql_system_tables_data.sql
+ )
+ 
+ ADD_CUSTOM_COMMAND(
+   OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/sql_commands_system_tables_data_fix.h
+-  COMMAND comp_sql
++  COMMAND ${COMP_SQL_COMMAND}
+   mysql_system_tables_data_fix
+   ${CMAKE_CURRENT_SOURCE_DIR}/mysql_system_tables_data_fix.sql
+   sql_commands_system_tables_data_fix.h
+   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+-  DEPENDS comp_sql
++  DEPENDS ${COMP_SQL_COMMAND}
+   ${CMAKE_CURRENT_SOURCE_DIR}/mysql_system_tables_data_fix.sql
+ )
+ 
+ ADD_CUSTOM_COMMAND(
+   OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/sql_commands_system_tables.h
+-  COMMAND comp_sql
++  COMMAND ${COMP_SQL_COMMAND}
+   mysql_system_tables
+   ${CMAKE_CURRENT_SOURCE_DIR}/mysql_system_tables.sql
+   sql_commands_system_tables.h
+   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+-  DEPENDS comp_sql
++  DEPENDS ${COMP_SQL_COMMAND}
+   ${CMAKE_CURRENT_SOURCE_DIR}/mysql_system_tables.sql
+ )
+ 
+ ADD_CUSTOM_COMMAND(
+   OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/sql_commands_system_users.h
+-  COMMAND comp_sql
++  COMMAND ${COMP_SQL_COMMAND}
+   mysql_system_users
+   ${CMAKE_CURRENT_SOURCE_DIR}/mysql_system_users.sql
+   sql_commands_system_users.h
+   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+-  DEPENDS comp_sql
++  DEPENDS ${COMP_SQL_COMMAND}
+   ${CMAKE_CURRENT_SOURCE_DIR}/mysql_system_users.sql
+ )
+ 
+ ADD_CUSTOM_COMMAND(
+   OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/sql_commands_help_data.h
+-  COMMAND comp_sql
++  COMMAND ${COMP_SQL_COMMAND}
+   fill_help_tables
+   ${CMAKE_CURRENT_SOURCE_DIR}/fill_help_tables.sql
+   sql_commands_help_data.h
+   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+-  DEPENDS comp_sql
++  DEPENDS ${COMP_SQL_COMMAND}
+   ${CMAKE_CURRENT_SOURCE_DIR}/fill_help_tables.sql
+ )
+ 
+ ADD_CUSTOM_COMMAND(
+   OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/sql_firewall_sp_set_firewall_mode.h
+-  COMMAND comp_sql
++  COMMAND ${COMP_SQL_COMMAND}
+   firewall_sp_set_firewall_mode
+   ${CMAKE_CURRENT_SOURCE_DIR}/firewall/firewall_sp_set_firewall_mode.sql
+   sql_firewall_sp_set_firewall_mode.h
+   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+-  DEPENDS comp_sql
++  DEPENDS ${COMP_SQL_COMMAND}
+   ${CMAKE_CURRENT_SOURCE_DIR}/firewall/firewall_sp_set_firewall_mode.sql
+ )
+ 
+ ADD_CUSTOM_COMMAND(
+   OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/sql_firewall_sp_reload_firewall_rules.h
+-  COMMAND comp_sql
++  COMMAND ${COMP_SQL_COMMAND}
+   firewall_sp_reload_firewall_rules
+   ${CMAKE_CURRENT_SOURCE_DIR}/firewall/firewall_sp_reload_firewall_rules.sql
+   sql_firewall_sp_reload_firewall_rules.h
+   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+-  DEPENDS comp_sql
++  DEPENDS ${COMP_SQL_COMMAND}
+   ${CMAKE_CURRENT_SOURCE_DIR}/firewall/firewall_sp_reload_firewall_rules.sql
+ )
+ 
+ ADD_CUSTOM_COMMAND(
+   OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/sql_firewall_sp_set_firewall_group_mode.h
+-  COMMAND comp_sql
++  COMMAND ${COMP_SQL_COMMAND}
+   firewall_sp_set_firewall_group_mode
+   ${CMAKE_CURRENT_SOURCE_DIR}/firewall/firewall_sp_set_firewall_group_mode.sql
+   sql_firewall_sp_set_firewall_group_mode.h
+   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+-  DEPENDS comp_sql
++  DEPENDS ${COMP_SQL_COMMAND}
+   ${CMAKE_CURRENT_SOURCE_DIR}/firewall/firewall_sp_set_firewall_group_mode.sql
+ )
+ 
+ ADD_CUSTOM_COMMAND(
+   OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/sql_firewall_sp_set_firewall_group_mode_and_user.h
+-  COMMAND comp_sql
++  COMMAND ${COMP_SQL_COMMAND}
+   firewall_sp_set_firewall_group_mode_and_user
+   ${CMAKE_CURRENT_SOURCE_DIR}/firewall/firewall_sp_set_firewall_group_mode_and_user.sql
+   sql_firewall_sp_set_firewall_group_mode_and_user.h
+   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+-  DEPENDS comp_sql
++  DEPENDS ${COMP_SQL_COMMAND}
+   ${CMAKE_CURRENT_SOURCE_DIR}/firewall/firewall_sp_set_firewall_group_mode_and_user.sql
+ )
+ 
+ ADD_CUSTOM_COMMAND(
+   OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/sql_firewall_sp_reload_firewall_group_rules.h
+-  COMMAND comp_sql
++  COMMAND ${COMP_SQL_COMMAND}
+   firewall_sp_reload_firewall_group_rules
+   ${CMAKE_CURRENT_SOURCE_DIR}/firewall/firewall_sp_reload_firewall_group_rules.sql
+   sql_firewall_sp_reload_firewall_group_rules.h
+   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+-  DEPENDS comp_sql
++  DEPENDS ${COMP_SQL_COMMAND}
+   ${CMAKE_CURRENT_SOURCE_DIR}/firewall/firewall_sp_reload_firewall_group_rules.sql
+ )
+ 
+ ADD_CUSTOM_COMMAND(
+   OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/sql_firewall_sp_firewall_group_enlist.h
+-  COMMAND comp_sql
++  COMMAND ${COMP_SQL_COMMAND}
+   firewall_sp_firewall_group_enlist
+   ${CMAKE_CURRENT_SOURCE_DIR}/firewall/firewall_sp_firewall_group_enlist.sql
+   sql_firewall_sp_firewall_group_enlist.h
+   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+-  DEPENDS comp_sql
++  DEPENDS ${COMP_SQL_COMMAND}
+   ${CMAKE_CURRENT_SOURCE_DIR}/firewall/firewall_sp_firewall_group_enlist.sql
+ )
+ 
+ ADD_CUSTOM_COMMAND(
+   OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/sql_firewall_sp_firewall_group_delist.h
+-  COMMAND comp_sql
++  COMMAND ${COMP_SQL_COMMAND}
+   firewall_sp_firewall_group_delist
+   ${CMAKE_CURRENT_SOURCE_DIR}/firewall/firewall_sp_firewall_group_delist.sql
+   sql_firewall_sp_firewall_group_delist.h
+   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+-  DEPENDS comp_sql
++  DEPENDS ${COMP_SQL_COMMAND}
+   ${CMAKE_CURRENT_SOURCE_DIR}/firewall/firewall_sp_firewall_group_delist.sql
+ )
+ 
+--- a/scripts/sys_schema/CMakeLists.txt
++++ b/scripts/sys_schema/CMakeLists.txt
+@@ -208,12 +208,12 @@
+ 
+ ADD_CUSTOM_COMMAND(
+   OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/sql_commands.h
+-  COMMAND comp_sql
++  COMMAND ${COMP_SQL_COMMAND}
+   mysql_sys_schema
+   ${CMAKE_CURRENT_BINARY_DIR}/ALL_SYS_SCHEMA.sql
+   sql_commands.h
+   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+-  DEPENDS comp_sql all_sys_schema
++  DEPENDS ${COMP_SQL_COMMAND} all_sys_schema
+   ${CMAKE_CURRENT_BINARY_DIR}/ALL_SYS_SCHEMA.sql
+   VERBATIM
+ )
+@@ -223,7 +223,7 @@
+ 
+ MY_ADD_CUSTOM_TARGET(GenSysSchemaC
+   ALL
+-  DEPENDS comp_sql sql_commands
++  DEPENDS ${COMP_SQL_COMMAND} sql_commands
+   COMMENT "Generating Sys Schema C code"
+ )
+ 

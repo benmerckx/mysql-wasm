@@ -4,6 +4,10 @@ An experimental port of MySQL Community Server to WebAssembly. The first
 milestone is to start the server, create an InnoDB table, insert a row, shut
 down cleanly, and read the row after reopening the same data directory.
 
+Verified with Emscripten 6.0.9 and Node.js 24 on Linux. The wasm64 server
+initialized a new data directory, wrote an InnoDB row, and recovered it
+after a clean shutdown and restart.
+
 ## Upstream source
 
 The `upstream/mysql-server` Git submodule pins the official
@@ -25,23 +29,32 @@ git add upstream/mysql-server
 Run the target probes and review upstream changes before committing the new
 pin. The upstream license is in [upstream/mysql-server/LICENSE](upstream/mysql-server/LICENSE).
 
-## Target probes
+## Build the wasm64 prototype
 
-The scripts run out-of-source CMake configuration and require CMake and
-Ninja. Both accept additional CMake arguments.
+Use a Linux build host with CMake, Ninja, GNU Make, Perl, Bison, a native
+C/C++ toolchain, native OpenSSL and ncurses development headers, Emscripten
+6.0.9, and Node.js 24. Activate the Emscripten SDK, then run:
 
-- `./scripts/configure-wasix` uses [wasixcc](https://github.com/wasix-org/wasixcc)
-  under `~/.wasixcc` or `$WASIXCC_ROOT`. With wasixcc 0.4.7, configuration
-  reports `SIZEOF_VOIDP 4` and stops with `MySQL supports only 64-bit platforms.`
-- `./scripts/configure-emscripten` uses an activated
-  [Emscripten SDK](https://emscripten.org/docs/getting_started/downloads.html).
-  With Emscripten 6.0.9, `-m64 -pthread` passes MySQL's pointer-size check.
-  Configuration then stops at `No mysys timer support detected!` because
-  Emscripten exposes neither the POSIX timer functions MySQL checks for nor
-  the kqueue alternative. A separate wasm64 probe created and joined a
-  pthread in Node 24.
+```sh
+./scripts/build-dependencies
+./scripts/configure-emscripten
+source_dir=$(./scripts/prepare-source)
+cmake --build "build/emscripten/$(basename "$source_dir")" --target mysqld --parallel 4
+./scripts/smoke-innodb
+```
 
-Neither probe currently produces a runnable MySQL server. The Emscripten
-wasm64 target is the next candidate for the InnoDB milestone. MySQL removed
-`libmysqld` in 8.0, so the 8.4 port will need its own startup and SQL bridge.
-[MySQL 8.0 removal notes](https://dev.mysql.com/doc/refman/8.0/en/mysql-nutshell.html)
+The build prepares native code generators and static wasm64 OpenSSL.
+The port patches are applied to a generated checkout under `build/sources/`,
+so the MySQL submodule stays at the upstream tag. The prototype uses Node's
+filesystem, runs SQL batches from `--init-file`, and uses MySQL's normal
+shutdown path. It targets a local CLI experiment. A long-lived SQL bridge
+and browser integration are separate milestones.
+
+Run `./scripts/test-timers` to exercise the Emscripten timer backend in Node.
+It covers expiry, cancellation, cleanup, and restarting the timer dispatcher.
+
+### WASIX
+
+`./scripts/configure-wasix` is preserved as a baseline probe. wasixcc 0.4.7
+targets wasm32, which MySQL 8.4 rejects because it requires 64-bit pointers.
+The Emscripten build uses `-m64 -pthread`.

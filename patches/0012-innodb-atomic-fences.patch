@@ -1,0 +1,11 @@
+--- a/storage/innobase/include/os0atomic.h
++++ b/storage/innobase/include/os0atomic.h
+@@ -43,7 +43,7 @@
+ #include "univ.i"
+ 
+ /** barrier definitions for memory ordering */
+-#ifdef HAVE_IB_GCC_ATOMIC_THREAD_FENCE
++#if defined(HAVE_IB_GCC_ATOMIC_THREAD_FENCE) || defined(__EMSCRIPTEN__)
+ #define HAVE_MEMORY_BARRIER
+ #define os_rmb __atomic_thread_fence(__ATOMIC_ACQUIRE)
+ #define os_wmb __atomic_thread_fence(__ATOMIC_RELEASE)

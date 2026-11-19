@@ -1,0 +1,36 @@
+--- a/libmysql/CMakeLists.txt
++++ b/libmysql/CMakeLists.txt
+@@ -284,7 +284,7 @@
+   ENDIF()
+ ENDIF()
+ 
+-IF(HAVE_DNS_SRV EQUAL 0)
++IF(HAVE_DNS_SRV EQUAL 0 AND NOT EMSCRIPTEN)
+   MESSAGE(FATAL_ERROR "Can't find neither Win32 nor Unix DNS SRV APIs")
+ ENDIF()
+ #
+--- a/libmysql/dns_srv.cc
++++ b/libmysql/dns_srv.cc
+@@ -132,18 +132,13 @@
+     error = status;
+   return status != ERROR_SUCCESS;
+ }
+-#else
+-
+-#error "No DNS SRV Support detected for your OS. Consider adjusting Cmake."
+-
+-#if 0
+-// dummy function returning an error in case it's not supported by the OS
+-
+-static bool get_dns_srv(Dns_srv_data &data, const char *dnsname, int &error) {
++#elif defined(__EMSCRIPTEN__)
++static bool get_dns_srv(Dns_srv_data &, const char *, int &error) {
+   error = -1;  // set a special error code for not supported
+   return true;
+ }
+-#endif
++#else
++#error "No DNS SRV Support detected for your OS. Consider adjusting Cmake."
+ #endif
+ 
+ /**

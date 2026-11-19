@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+root="$(cd "$(dirname "$0")/.." && pwd)"
+upstream="$root/upstream/mysql-server"
+if [[ ! -f "$upstream/CMakeLists.txt" ]]; then
+  echo 'Initialize MySQL with git submodule update --init first.' >&2
+  exit 1
+fi
+if ! command -v emcc >/dev/null 2>&1; then
+  echo 'Activate the Emscripten SDK before building dependencies.' >&2
+  exit 1
+fi
+
+jobs="${JOBS:-4}"
+native="$root/build/native"
+openssl="$root/build/openssl"
+prefix="$root/build/openssl-wasm64"
+
+cmake -S "$upstream" -B "$native" -G Ninja \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DWITHOUT_SERVER=ON -DWITH_ROUTER=OFF -DWITH_UNIT_TESTS=OFF \
+  -DWITH_TIRPC=bundled
+cmake --build "$native" --target comp_err uca9dump comp_sql --parallel "$jobs"
+
+if [[ ! -d "$openssl/.git" ]]; then
+  git clone --depth 1 --branch openssl-3.5.9 https://github.com/openssl/openssl.git "$openssl"
+fi
+cd "$openssl"
+CC=emcc CXX=em++ AR=emar RANLIB=emranlib ./Configure linux-generic64 \
+  -m64 -pthread no-asm no-shared no-tests no-module no-dso no-apps \
+  no-async no-afalgeng no-ktls no-quic --prefix="$prefix" --libdir=lib
+make -j"$jobs" build_sw
+make install_sw

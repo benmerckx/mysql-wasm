@@ -1,0 +1,12 @@
+--- a/sql/mysqld.cc
++++ b/sql/mysqld.cc
+@@ -7831,7 +7831,9 @@
+     plugins/components.
+   */
+   if (!is_help_or_validate_option() && !opt_initialize) {
++#ifndef __EMSCRIPTEN__
+     dynamic_loader_srv->load(component_urns, NUMBER_OF_COMPONENTS);
++#endif
+     g_event_channels = Event_reference_caching_channels::create();
+   }
+   init_srv_event_tracking_handles();

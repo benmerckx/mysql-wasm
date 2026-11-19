@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+root="$(cd "$(dirname "$0")/.." && pwd)"
+source_dir="${MYSQL_WASM_SOURCE_DIR:-$("$root/scripts/prepare-source")}"
+build_dir="${MYSQL_WASM_BUILD_DIR:-$root/build/emscripten/$(basename "$source_dir")}"
+server="$build_dir/runtime_output_directory/mysqld.js"
+
+if [[ ! -f "$server" ]]; then
+  echo "Build the mysqld target in $build_dir first." >&2
+  exit 1
+fi
+
+work="$(mktemp -d)"
+trap 'rm -rf -- "$work"' EXIT
+mkdir -m 700 "$work/data" "$work/files"
+common=(
+  --no-defaults
+  --user=root
+  --datadir="$work/data"
+  --lc-messages-dir="$build_dir/share"
+  --character-sets-dir="$source_dir/share/charsets"
+  --secure-file-priv="$work/files"
+  --tmpdir="$work"
+  --skip-networking
+  --skip-log-bin
+  --innodb-buffer-pool-size=33554432
+  --innodb-read-io-threads=1
+  --innodb-write-io-threads=1
+  --innodb-purge-threads=1
+)
+node "$server" "${common[@]}" --initialize-insecure
+cat > "$work/write.sql" <<'SQL'
+CREATE DATABASE smoke;
+CREATE TABLE smoke.records (id INT PRIMARY KEY, value VARCHAR(16)) ENGINE=InnoDB;
+INSERT INTO smoke.records VALUES (1, 'persisted');
+SQL
+node "$server" "${common[@]}" --init-file="$work/write.sql"
+printf "SELECT value INTO OUTFILE '%s' FROM smoke.records WHERE id = 1;\n" \
+  "$work/files/result.txt" > "$work/read.sql"
+node "$server" "${common[@]}" --init-file="$work/read.sql"
+test "$(cat "$work/files/result.txt")" = persisted
+echo 'InnoDB row survived a clean restart.'

@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+root="$(cd "$(dirname "$0")/.." && pwd)"
+upstream="$root/upstream/mysql-server"
+if [[ ! -f "$upstream/CMakeLists.txt" ]]; then
+  echo 'Initialize MySQL with git submodule update --init first.' >&2
+  exit 1
+fi
+
+revision="$(git -C "$upstream" rev-parse HEAD)"
+patches=("$root"/patches/*.patch)
+backend="$root/port/emscripten_timers.cc"
+fingerprint="$(
+  {
+    printf '%s\n' "$revision"
+    git hash-object "${patches[@]}" "$backend"
+  } | git hash-object --stdin
+)"
+destination="$root/build/sources/$fingerprint"
+if [[ ! -d "$destination" ]]; then
+  mkdir -p "$root/build/sources"
+  staging="$(mktemp -d "$root/build/sources/staging.XXXXXX")"
+  trap 'rm -rf -- "$staging"' EXIT
+  git -C "$upstream" archive "$revision" | tar -xf - -C "$staging"
+  for patch in "${patches[@]}"; do
+    patch -d "$staging" -p1 --forward < "$patch" >&2
+  done
+  cp "$backend" "$staging/mysys/"
+  mv "$staging" "$destination"
+fi
+printf '%s\n' "$destination"

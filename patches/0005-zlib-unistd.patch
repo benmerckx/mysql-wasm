@@ -1,0 +1,11 @@
+--- a/extra/zlib/CMakeLists.txt
++++ b/extra/zlib/CMakeLists.txt
+@@ -45,4 +45,8 @@
+   STRING_APPEND(CMAKE_C_FLAGS " -Wno-shorten-64-to-32")
+ ENDIF()
+ 
++IF(EMSCRIPTEN)
++  ADD_COMPILE_DEFINITIONS(Z_HAVE_UNISTD_H)
++ENDIF()
++
+ ADD_SUBDIRECTORY(${ZLIB_VERSION_DIR})
