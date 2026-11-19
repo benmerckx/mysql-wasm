@@ -1,3 +1,4 @@
+import { directory, file, local, readDatadir, writeDatadir } from './datadir.mjs';
 import { serverOptions } from './options.mjs';
 import { prefix, queryError } from './protocol.mjs';
 
@@ -89,26 +90,30 @@ function restore(fs, root, entries) {
   }
 }
 
-function saveFiles(fs, root, path = '', files = []) {
-  for (const entry of fs.readdir(root + path)) {
-    if (entry === '.' || entry === '..') continue;
-    const child = path + '/' + entry;
-    if (fs.isDir(fs.stat(root + child).mode)) {
-      files.push([child, null]);
-      saveFiles(fs, root, child, files);
+// Server threads proxy every filesystem call to this thread, so reading the
+// files synchronously sees one point in time. The result is crash-consistent
+// and InnoDB recovers it on load like any crash.
+function snapshot(fs, root, path = '', entries = []) {
+  for (const name of fs.readdir(root + '/' + path)) {
+    if (name === '.' || name === '..' || local.test(name)) continue;
+    const child = path ? path + '/' + name : name;
+    if (fs.isDir(fs.stat(root + '/' + child).mode)) {
+      entries.push(directory(child));
+      snapshot(fs, root, child, entries);
     } else {
-      files.push([child, fs.readFile(root + child)]);
+      entries.push(file(child, fs.readFile(root + '/' + child)));
     }
   }
-  return files;
+  return entries;
 }
 
 // Runs the server inside this JavaScript realm. `storage` mounts a persistent
-// filesystem at the data directory, or is omitted for in-memory storage.
-// `datadir` loads the prebuilt data directory, which needs a case-sensitive
-// filesystem like the in-memory and IndexedDB ones.
-export async function openEngine({ createEngine, locateFile, assets, storage, datadir }) {
-  const directory = storage?.directory ?? '/db';
+// filesystem at the data directory, or is omitted for in-memory storage. An
+// empty data directory is filled from `load`, a snapshot from `dump()`, or the
+// prebuilt `template`, which needs a case-sensitive filesystem like the
+// in-memory and IndexedDB ones.
+export async function openEngine({ createEngine, locateFile, assets, storage, load, template }) {
+  const root = storage?.directory ?? '/db';
   async function prepare() {
     const runtime = createRuntime(createEngine, locateFile);
     const [instance, files] = await Promise.all([runtime.module, assets]);
@@ -117,33 +122,35 @@ export async function openEngine({ createEngine, locateFile, assets, storage, da
       fs.mkdirTree('/' + path.slice(0, path.lastIndexOf('/')));
       fs.writeFile('/' + path, bytes);
     }
-    fs.mkdir(directory);
-    if (storage) await storage.mount(fs, directory);
+    fs.mkdir(root);
+    if (storage) await storage.mount(fs, root);
     return { ...runtime, instance, fs };
   }
 
-  // A runtime cannot call main twice, so initialization uses its own instance.
   let engine = await prepare();
-  const serverArgs = [...args, `--datadir=${directory}`];
-  const empty = isEmpty(engine.fs, directory);
-  if (empty && datadir) {
-    restore(engine.fs, directory, await datadir());
+  const serverArgs = [...args, `--datadir=${root}`];
+  const empty = isEmpty(engine.fs, root);
+  if (load && !empty) throw new Error('Cannot load a snapshot into an existing data directory');
+  if (empty && (load || template)) {
+    restore(engine.fs, root, await readDatadir(load ?? await template()));
   } else if (empty) {
+    // A runtime cannot call main twice, so initialization uses its own instance.
     engine.instance.callMain([...serverArgs, '--initialize-insecure']);
     await engine.exited;
-    let files;
+    const files = storage ? null : snapshot(engine.fs, root);
     if (storage) await storage.sync?.(engine.fs);
-    else files = saveFiles(engine.fs, directory);
     engine = await prepare();
-    if (files) for (const [path, bytes] of files) {
-      if (bytes === null) engine.fs.mkdir(directory + path);
-      else engine.fs.writeFile(directory + path, bytes);
-    }
+    if (files) restore(engine.fs, root, files);
   }
   engine.instance.callMain(serverArgs);
   await engine.ready;
   return {
-    send: engine.send,
+    async send(frame) {
+      const results = await engine.send(frame);
+      storage?.changed?.(engine.fs);
+      return results;
+    },
+    dump: () => writeDatadir(snapshot(engine.fs, root)),
     persist: async () => { await storage?.sync?.(engine.fs); },
     async close() {
       engine.instance.ccall('mysql_wasm_finish', null, [], []);

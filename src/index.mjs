@@ -1,153 +1,59 @@
-import { spawn } from 'node:child_process';
-import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
-import { createInterface } from 'node:readline';
+import { readFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { prefix, queryError } from './protocol.mjs';
-import { Connection } from './connection.mjs';
 import { readAssets } from './assets.mjs';
-import { readDatadir } from './datadir.mjs';
-import { caseSensitive, restore } from './disk.mjs';
-import { serverOptions } from './options.mjs';
+import { Connection } from './connection.mjs';
+import { prepare } from './disk.mjs';
+import { openEngine } from './engine.mjs';
 
-const defaultBuild = fileURLToPath(new URL('../dist/', import.meta.url));
+export { types } from './types.mjs';
 
-async function prepareAssets(root, scratch) {
-  let bundle;
-  try {
-    bundle = await readFile(join(root, 'assets.data'));
-  } catch (error) {
-    if (error.code === 'ENOENT') return root; // Existing build directories have loose assets.
-    throw error;
-  }
-  const basedir = join(scratch, 'runtime');
-  for (const [path, bytes] of readAssets(bundle)) {
-    const target = join(basedir, path);
-    await mkdir(dirname(target), { recursive: true });
-    await writeFile(target, bytes);
-  }
-  return basedir;
-}
+const dist = new URL('../dist/', import.meta.url);
+const template = () => readFile(new URL('datadir.data', dist));
 
-function launch(server, args, initialization = false) {
-  const child = spawn(process.execPath, [server, ...args], {
-    stdio: [initialization ? 'ignore' : 'pipe', 'pipe', 'pipe'],
-    windowsHide: true,
-  });
-  let stderr = '';
-  child.stderr.setEncoding('utf8').on('data', (part) => {
-    stderr = (stderr + part).slice(-8192);
-  });
-  const ready = Promise.withResolvers();
-  const finished = Promise.withResolvers();
-  const pending = [];
-  // Consumers await either startup or exit at different points in the lifecycle.
-  ready.promise.catch(() => {});
-  finished.promise.catch(() => {});
-  let closing = initialization;
-  let failure;
-  function fail(error) {
-    failure ??= error;
-    ready.reject(failure);
-    for (const request of pending.splice(0)) request.reject(failure);
-  }
-  child.on('error', fail);
-  child.stdin?.on('error', fail);
-  const lines = createInterface({ input: child.stdout });
-  lines.on('line', (line) => {
-    if (!line.startsWith(prefix)) return;
-    try {
-      const message = JSON.parse(line.slice(prefix.length));
-      if (message.ready) ready.resolve();
-      else {
-        const request = pending.shift();
-        if (!request) throw new Error('Unexpected MySQL response');
-        if (message.error) request.reject(queryError(message));
-        else request.resolve(message.results);
-      }
-    } catch (error) {
-      fail(error);
-    }
-  });
-  child.once('close', (code, signal) => {
-    if (code !== 0 || !closing) {
-      fail(new Error(`MySQL exited (${signal ?? code})${stderr ? '\n' + stderr.trimEnd() : ''}`));
-    } else if (pending.length) {
-      fail(new Error('MySQL exited with requests pending'));
-    }
-    if (failure) finished.reject(failure);
-    else finished.resolve();
-  });
-
+function nodeFileSystem(path) {
   return {
-    ready: ready.promise,
-    exit: finished.promise,
-    send(frame) {
-      if (failure) return Promise.reject(failure);
-      const request = Promise.withResolvers();
-      pending.push(request);
-      child.stdin.write(frame);
-      return request.promise;
-    },
-    async close() {
-      closing = true;
-      child.stdin.end();
-      await finished.promise;
+    mount(fs, directory) {
+      fs.mount(fs.filesystems.NODEFS, { root: path }, directory);
     },
   };
 }
 
+// Runs MySQL in this process, on worker threads, like the browser build.
 export class MySQL extends Connection {
-  static async create({ dataDir, buildDir = defaultBuild } = {}) {
-    if (dataDir?.startsWith('idb://')) throw new TypeError('IndexedDB requires a browser');
-    const root = resolve(buildDir);
-    const path = dataDir?.startsWith('file://') ? fileURLToPath(dataDir) : dataDir;
-    const scratch = await mkdtemp(join(tmpdir(), 'mysql-wasm-'));
-    const server = join(root, 'runtime_output_directory', 'mysqld.js');
-    const data = path && path !== 'memory://' ? resolve(path) : join(scratch, 'data');
-    const lock = join(data, '.mysql-wasm-lock');
-    let locked = false;
-    let child;
+  static async create({ dataDir = 'memory://', load } = {}) {
+    if (dataDir.startsWith('idb://')) throw new TypeError('IndexedDB requires a browser');
+    const { default: createEngine } = await import(new URL('browser/mysqld.js', dist));
+    const path = dataDir === 'memory://' ? null
+      : resolve(dataDir.startsWith('file://') ? fileURLToPath(dataDir) : dataDir);
+    // Emscripten's threads do not keep Node alive while the server waits.
+    const alive = setInterval(() => {}, 1 << 30);
+    let release;
     async function cleanup() {
-      try {
-        if (locked) await rm(lock, { recursive: true });
-      } finally {
-        await rm(scratch, { recursive: true, force: true });
-      }
+      clearInterval(alive);
+      await release?.();
     }
     try {
-      await mkdir(data, { recursive: true, mode: 0o700 });
-      await mkdir(lock, { mode: 0o700 });
-      locked = true;
-      const basedir = await prepareAssets(root, scratch);
-      const args = [
-        '--no-defaults',
-        `--basedir=${basedir}`,
-        ...(process.getuid?.() === 0 ? ['--user=root'] : []),
-        `--datadir=${data}`,
-        `--lc-messages-dir=${join(basedir, 'share')}`,
-        `--character-sets-dir=${join(basedir, 'share', 'charsets')}`,
-        `--secure-file-priv=${scratch}`,
-        `--tmpdir=${scratch}`,
-        `--pid-file=${join(scratch, 'mysqld.pid')}`,
-        ...serverOptions,
-      ];
-      if (!(await readdir(data)).some(name => !name.startsWith('.'))) {
-        if (await caseSensitive(data)) {
-          await restore(data, await readDatadir(await readFile(join(root, 'datadir.data'))));
-        } else {
-          await launch(server, [...args, '--initialize-insecure'], true).exit;
-        }
+      // Restoring here rather than through NODEFS keeps the files sparse.
+      if (path) release = await prepare(path, { load, template });
+      const engine = await openEngine({
+        createEngine,
+        locateFile: file => fileURLToPath(new URL(file === 'mysqld.wasm' ? file : 'browser/' + file, dist)),
+        assets: readFile(new URL('assets.data', dist)).then(readAssets),
+        storage: path ? nodeFileSystem(path) : undefined,
+        load: path ? undefined : load,
+        template: path ? undefined : template,
+      });
+      const db = new MySQL(engine, cleanup);
+      try {
+        await db.exec('CREATE DATABASE IF NOT EXISTS test; USE test');
+        return db;
+      } catch (error) {
+        await db.close().catch(() => {});
+        throw error;
       }
-      child = launch(server, args);
-      await child.ready;
-      const db = new MySQL(child, cleanup);
-      await db.exec('CREATE DATABASE IF NOT EXISTS test; USE test');
-      return db;
     } catch (error) {
-      if (child) await child.close().catch(() => {});
       await cleanup();
       throw error;
     }

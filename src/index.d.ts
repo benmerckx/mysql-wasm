@@ -1,36 +1,19 @@
-export type SqlParam = string | number | bigint | boolean | null | Date | ArrayBuffer | ArrayBufferView;
+import type { CreateOptions, Database } from './types.js';
 
-export interface Field {
-  name: string;
-  type: number;
-  charset: number;
-  flags: number;
-}
+export { types } from './types.js';
+export type { CreateOptions, Database, Field, QueryOptions, QueryResult, SqlParam, Transaction } from './types.js';
 
-export interface QueryResult<Row = Record<string, unknown>> {
-  rows: Row[];
-  fields: Field[];
-  affectedRows: number;
-}
-
-export interface Transaction {
-  query<Row = Record<string, unknown>>(sql: string, params?: readonly SqlParam[]): Promise<QueryResult<Row>>;
-  exec(sql: string): Promise<QueryResult[]>;
-}
-
-export interface MySQLOptions {
-  /** A filesystem path. Omit for a temporary database. */
+export interface MySQLOptions extends CreateOptions {
+  /** A filesystem path or file:// URL. Omit or use memory:// for a temporary database. */
   dataDir?: string;
-  /** Directory containing the staged runtime and its data files. */
-  buildDir?: string;
 }
 
-export class MySQL implements Transaction {
+/** Runs MySQL in this process, on worker threads. */
+export interface MySQL extends Database {
+  /** A crash-consistent snapshot of the data directory, for `load`. */
+  dump(): Promise<Uint8Array>;
+}
+export declare class MySQL {
   private constructor();
   static create(options?: MySQLOptions): Promise<MySQL>;
-  query<Row = Record<string, unknown>>(sql: string, params?: readonly SqlParam[]): Promise<QueryResult<Row>>;
-  exec(sql: string): Promise<QueryResult[]>;
-  transaction<T>(callback: (tx: Transaction) => Promise<T> | T): Promise<T>;
-  persist(): Promise<void>;
-  close(): Promise<void>;
 }

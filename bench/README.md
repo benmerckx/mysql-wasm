@@ -31,9 +31,10 @@ package. PGlite uses `fsync=off`, `synchronous_commit=on`, and
 `relaxedDurability=false`. These are OS-buffered write comparisons. InnoDB
 and PostgreSQL have different redo/WAL policies and make different crash
 durability guarantees. Their default cache sizes differ too. The Node benchmark
-runs mysql-wasm twice: `mysql` uses the child-process `MySQL` client and
-`mysql-worker` uses `MySQLWorker`, which runs the server in the caller like
-PGlite. Timings include each API's transport costs.
+runs mysql-wasm twice: `mysql` uses `MySQL`, which runs the server in the
+caller like PGlite, and `mysql-process` uses the child-process `MySQLProcess`.
+Timings include each API's transport costs. Results recorded before 0.2.0
+call these `mysql-worker` and `mysql`.
 
 For memory, a separate process reopens the workload database and repeats the
 scan. A parent samples RSS at roughly 10 ms intervals using `ps`, including a

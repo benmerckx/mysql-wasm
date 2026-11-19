@@ -1,42 +1,40 @@
 import { decodeResults, encodeRequest } from './protocol.mjs';
 
+const empty = { rows: [], fields: [], affectedRows: 0, insertId: 0 };
+
 export class Connection {
-  #process;
+  #transport;
   #cleanup;
   #closing;
-  #persisting;
-  #transaction = false;
+  #queue = Promise.resolve();
 
   constructor(transport, cleanup = () => {}) {
-    this.#process = transport;
+    this.#transport = transport;
     this.#cleanup = cleanup;
   }
 
-  #checkAvailable() {
+  #check() {
     if (this.#closing) throw new Error('Database is closed');
-    if (this.#transaction) throw new Error('Use the active transaction');
   }
 
-  async #run(mode, sql, params) {
+  // The server has one session, so calls run in order and a transaction holds
+  // it until it ends. Calls made meanwhile wait, as they do in PGlite.
+  #serial(run) {
+    this.#check();
+    const result = this.#queue.then(run);
+    this.#queue = result.catch(() => {});
+    return result;
+  }
+
+  async #run(mode, sql, params, rowMode) {
     if (typeof sql !== 'string') throw new TypeError('SQL must be a string');
-    return decodeResults(await this.#process.send(encodeRequest(mode, sql, params)));
+    return decodeResults(await this.#transport.send(encodeRequest(mode, sql, params)), rowMode);
   }
 
-  async #query(sql, params) {
+  async #query(sql, params, options) {
     if (params !== undefined && !Array.isArray(params)) throw new TypeError('SQL parameters must be an array');
-    const [result] = await this.#run(params === undefined ? 'q' : 'p', sql, params);
-    return result ?? { rows: [], fields: [], affectedRows: 0 };
-  }
-
-  async query(sql, params) {
-    this.#checkAvailable();
-    return this.#query(sql, params);
-  }
-
-  async exec(sql) {
-    this.#checkAvailable();
-    if (arguments.length > 1) throw new TypeError('Use query() with parameters');
-    return this.#exec(sql);
+    const [result] = await this.#run(params === undefined ? 'q' : 'p', sql, params, options?.rowMode);
+    return result ?? empty;
   }
 
   async #exec(sql) {
@@ -44,21 +42,35 @@ export class Connection {
     return this.#run('e', sql);
   }
 
-  async transaction(callback) {
-    this.#checkAvailable();
-    this.#transaction = true;
-    let active = true;
-    const checkActive = () => {
-      if (!active) throw new Error('Transaction has ended');
-    };
-    try {
-      await this.#persisting;
+  query(sql, params, options) {
+    return this.#serial(() => this.#query(sql, params, options));
+  }
+
+  sql(strings, ...params) {
+    return this.query(strings.join('?'), params);
+  }
+
+  exec(sql) {
+    if (arguments.length > 1) throw new TypeError('Use query() with parameters');
+    return this.#serial(() => this.#exec(sql));
+  }
+
+  // Calling the database instead of `tx` inside the callback waits for the
+  // transaction to end, so it never finishes.
+  transaction(callback) {
+    return this.#serial(async () => {
+      let active = true;
+      const check = () => {
+        if (!active) throw new Error('Transaction has ended');
+      };
+      const tx = {
+        query: async (sql, params, options) => (check(), this.#query(sql, params, options)),
+        sql: (strings, ...params) => tx.query(strings.join('?'), params),
+        exec: async sql => (check(), this.#exec(sql)),
+      };
       await this.#query('START TRANSACTION');
       try {
-        const result = await callback({
-          query: async (sql, params) => { checkActive(); return this.#query(sql, params); },
-          exec: async (sql) => { checkActive(); return this.#exec(sql); },
-        });
+        const result = await callback(tx);
         active = false;
         await this.#query('COMMIT');
         return result;
@@ -71,36 +83,31 @@ export class Connection {
         }
         throw error;
       }
-    } finally {
-      this.#transaction = false;
-    }
+    });
   }
 
-  async persist() {
-    this.#checkAvailable();
-    const previous = this.#persisting;
-    const pending = this.#persisting = (async () => {
-      await previous?.catch(() => {});
+  persist() {
+    return this.#serial(async () => {
       await this.#query('FLUSH ENGINE LOGS');
-      await this.#process.persist?.();
-    })();
-    try {
-      await pending;
-    } finally {
-      if (this.#persisting === pending) this.#persisting = undefined;
-    }
+      await this.#transport.persist?.();
+    });
   }
 
-  async close() {
+  dump() {
+    return this.#serial(() => {
+      if (!this.#transport.dump) throw new Error('dump() is only available on MySQL, not MySQLProcess');
+      return this.#transport.dump();
+    });
+  }
+
+  close() {
     if (this.#closing) return this.#closing;
-    this.#checkAvailable();
-    this.#closing = (async () => {
-      try {
-        await this.#persisting;
-      } finally {
-        await this.#process.close();
-      }
-    })().finally(this.#cleanup);
+    const closing = this.#serial(() => this.#transport.close());
+    this.#closing = closing.finally(this.#cleanup);
     return this.#closing;
   }
+}
+
+if (Symbol.asyncDispose) {
+  Connection.prototype[Symbol.asyncDispose] = function () { return this.close(); };
 }

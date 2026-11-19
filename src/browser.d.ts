@@ -1,19 +1,19 @@
-import type { QueryResult, SqlParam, Transaction } from './index.js';
+import type { CreateOptions, Database } from './types.js';
 
-export interface MySQLOptions {
+export { types } from './types.js';
+export type { CreateOptions, Database, Field, QueryOptions, QueryResult, SqlParam, Transaction } from './types.js';
+
+export interface MySQLOptions extends CreateOptions {
   /** Temporary storage by default, or IndexedDB when set to idb://name. */
   dataDir?: 'memory://' | `idb://${string}`;
 }
 
-export class MySQLWorker implements Transaction {
-  private constructor();
-  static create(options?: MySQLOptions): Promise<MySQLWorker>;
-  query<Row = Record<string, unknown>>(sql: string, params?: readonly SqlParam[]): Promise<QueryResult<Row>>;
-  exec(sql: string): Promise<QueryResult[]>;
-  transaction<T>(callback: (tx: Transaction) => Promise<T> | T): Promise<T>;
-  persist(): Promise<void>;
-  close(): Promise<void>;
+/** Runs MySQL in a dedicated worker. */
+export interface MySQL extends Database {
+  /** A crash-consistent snapshot of the data directory, for `load`. */
+  dump(): Promise<Uint8Array>;
 }
-
-export { MySQLWorker as MySQL };
-export type { Field, QueryResult, SqlParam, Transaction } from './index.js';
+export declare class MySQL {
+  private constructor();
+  static create(options?: MySQLOptions): Promise<MySQL>;
+}

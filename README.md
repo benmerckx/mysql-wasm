@@ -1,44 +1,55 @@
 # mysql-wasm
 
 MySQL Community Server 8.4 compiled to WebAssembly, with an async JavaScript
-API for Node.js and browsers. Node runs the server in a child process.
-Browsers run it in a dedicated worker.
+API for Node.js and browsers. Node runs the server in the current process, on
+worker threads. Browsers run it in a dedicated worker.
 
 ```js
 import { MySQL } from 'mysql-wasm';
 
-const db = await MySQL.create();
-try {
-  await db.exec('CREATE TABLE users (id INT PRIMARY KEY, name VARCHAR(80))');
-  await db.query('INSERT INTO users VALUES (?, ?)', [1, "O'Brien"]);
-  const { rows } = await db.query('SELECT * FROM users WHERE id = ?', [1]);
-  console.log(rows);
-} finally {
-  await db.close();
-}
+await using db = await MySQL.create();
+await db.exec('CREATE TABLE users (id INT AUTO_INCREMENT PRIMARY KEY, name VARCHAR(80))');
+const { insertId } = await db.query('INSERT INTO users (name) VALUES (?)', ["O'Brien"]);
+const { rows } = await db.sql`SELECT * FROM users WHERE id = ${insertId}`;
 ```
 
-- `query(sql, params?)` runs one statement and returns
-  `{ rows, fields, affectedRows }`. Parameters use MySQL's prepared-statement
-  protocol. Strings, numbers, booleans, bigints, dates, binary values and
-  `null` are supported. Use one placeholder per value in an `IN` list.
+- `query(sql, params?, { rowMode }?)` runs one statement and returns
+  `{ rows, fields, affectedRows, insertId }`. Parameters use MySQL's
+  prepared-statement protocol. Strings, numbers, booleans, bigints, dates,
+  binary values and `null` are supported. Use one placeholder per value in an
+  `IN` list. `rowMode: 'array'` returns rows as arrays, which keeps columns
+  that share a name.
+- `` sql`...` `` runs a template literal with its values as parameters.
 - `exec(sql)` runs a script and returns an array of results. MySQL parses
   the script, including quoted semicolons and compound statements.
-- `transaction(callback)` commits on success and rolls back on failure.
-  Use the transaction object for queries inside the callback. MySQL can
-  implicitly commit DDL.
-- `persist()` flushes the engine logs and, in the browser, saves to
-  IndexedDB. Always await `close()` to shut down cleanly.
+- `transaction(callback)` commits on success and rolls back on failure. Use
+  the transaction object inside the callback: calls on the database itself
+  wait until the transaction ends, so awaiting one there never finishes.
+  MySQL can implicitly commit DDL.
+- `dump()` returns a crash-consistent snapshot of the data directory as a
+  gzip-compressed `Uint8Array`. Pass it as `load` to `MySQL.create()` to start
+  a new database from it.
+- `persist()` flushes the engine logs and waits until browser storage is
+  saved. Await `close()`, or use `await using`, to shut down cleanly. Like
+  PGlite's, the type declarations use `Symbol.asyncDispose`, so TypeScript
+  needs an `esnext` lib or `skipLibCheck`.
+
+Results decode integers and floats as numbers. `BIGINT` values outside the
+safe integer range, and `insertId` beyond it, are bigints, as in PGlite.
+`DECIMAL` and date and time values are strings, JSON columns are parsed,
+and binary strings are `Uint8Array`s. `types` names the `Field.type` codes.
 
 Node.js 24 or later can use a filesystem path or `file://` URL for
-`dataDir`. Browsers accept `idb://name`. Omit `dataDir` or use
-`memory://` for temporary storage. Only one connection may open a given
-persistent data directory at a time. The browser implementation is
-also available explicitly as `MySQLWorker` from `mysql-wasm/worker`.
-In Node, that export runs the server inside the current process, on
-worker threads, with the same `dataDir` options. It avoids the child
-process, but a crash in the server takes the host process down with it.
-Both implementations can open each other's data directories.
+`dataDir`. Browsers accept `idb://name` and save writes to IndexedDB shortly
+after each query. Omit `dataDir` or use `memory://` for temporary storage.
+Only one connection may open a given persistent data directory at a time; a
+lock left by a crashed Node process is taken over. Snapshots and the prebuilt
+data directory use `lower_case_table_names=0`, so on a case-insensitive disk,
+such as most macOS volumes, load them into memory or IndexedDB instead.
+
+In Node, `MySQLProcess` from `mysql-wasm/process` runs the server in a child
+process instead, so a crash in the server cannot take the host down. It has
+the same API except `dump()`, and both open each other's data directories.
 
 ## Browser setup
 
@@ -51,8 +62,7 @@ Cross-Origin-Embedder-Policy: require-corp
 ```
 
 For Vite, set `worker.format` to `'es'`, set `build.target` to
-`'esnext'`, and exclude `mysql-wasm` and `mysql-wasm/worker` from
-dependency optimization. Serve the WASM asset as `application/wasm`.
+`'esnext'`, and exclude `mysql-wasm` from dependency optimization. Serve the WASM asset as `application/wasm`.
 
 ## Compact build
 

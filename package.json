@@ -1,6 +1,6 @@
 {
   "name": "mysql-wasm",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "MySQL Community Server 8.4 compiled to WebAssembly",
   "type": "module",
   "exports": {
@@ -12,13 +12,9 @@
       "types": "./src/index.d.ts",
       "import": "./src/index.mjs"
     },
-    "./worker": {
-      "browser": {
-        "types": "./src/browser.d.ts",
-        "import": "./src/browser.mjs"
-      },
-      "types": "./src/worker.d.ts",
-      "import": "./src/worker.mjs"
+    "./process": {
+      "types": "./src/process.d.ts",
+      "import": "./src/process.mjs"
     }
   },
   "files": [

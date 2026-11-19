@@ -1,3 +1,5 @@
+import { binary, types } from './types.mjs';
+
 export const prefix = 'MYSQL_WASM\t';
 const encoder = new TextEncoder();
 const decoder = new TextDecoder('utf-8', { ignoreBOM: true });
@@ -64,28 +66,36 @@ function decodeCell(value, field) {
   const bytes = fromHex(value);
   const text = () => decoder.decode(bytes);
   switch (field.type) {
-    case 1: case 2: case 3: case 4: case 5: case 9: case 13:
+    case types.tiny: case types.short: case types.long: case types.float:
+    case types.double: case types.int24: case types.year:
       return Number(text());
-    case 8: {
-      const s = text();
-      const number = Number(s);
-      return Number.isSafeInteger(number) ? number : s;
-    }
-    case 245:
+    case types.longlong:
+      return integer(text());
+    case types.json:
       return JSON.parse(text());
-    case 0: case 7: case 10: case 11: case 12: case 14: case 246:
+    case types.decimal: case types.newdecimal: case types.timestamp: case types.date:
+    case types.time: case types.datetime: case types.newdate:
       return text();
     default:
-      return field.charset === 63 ? bytes : text();
+      return field.charset === binary ? bytes : text();
   }
 }
 
-export function decodeResults(results) {
-  return results.map(({ rows, fields, affectedRows }) => ({
-    rows: rows.map(row => Object.fromEntries(
-      fields.map((field, i) => [field.name, decodeCell(row[i], field)]),
-    )),
-    fields,
-    affectedRows,
-  }));
+// Like PGlite's int8: a number when exact, otherwise a bigint.
+function integer(text) {
+  const number = Number(text);
+  return Number.isSafeInteger(number) ? number : BigInt(text);
+}
+
+export function decodeResults(results, rowMode = 'object') {
+  return results.map(({ rows, fields, affectedRows, insertId }) => {
+    const cells = rows.map(row => fields.map((field, i) => decodeCell(row[i], field)));
+    return {
+      rows: rowMode === 'array' ? cells
+        : cells.map(row => Object.fromEntries(fields.map((field, i) => [field.name, row[i]]))),
+      fields,
+      affectedRows,
+      insertId: integer(insertId),
+    };
+  });
 }

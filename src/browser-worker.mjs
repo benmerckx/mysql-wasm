@@ -1,6 +1,5 @@
 import createEngine from '../dist/browser/mysqld.js';
 import { readAssets } from './assets.mjs';
-import { readDatadir } from './datadir.mjs';
 import { openEngine } from './engine.mjs';
 
 const wasmUrl = new URL('../dist/mysqld.wasm', import.meta.url).href;
@@ -33,7 +32,18 @@ async function holdStorageLock(name) {
   return release.resolve;
 }
 
+// Writes reach IndexedDB shortly after each query, batched over a short
+// window; persist() and close() save at once. A failed background save is
+// retried by the next one, and persist() reports it.
 function indexedDB(name) {
+  let saving = Promise.resolve();
+  let timer;
+  function save(fs) {
+    clearTimeout(timer);
+    timer = undefined;
+    // IDBFS cannot run two syncs at once.
+    return saving = saving.catch(() => {}).then(() => sync(fs, false));
+  }
   return {
     // IDBFS names its IndexedDB database after the mount path.
     directory: '/db-' + encodeURIComponent(name),
@@ -41,11 +51,14 @@ function indexedDB(name) {
       fs.mount(fs.filesystems.IDBFS, {}, directory);
       await sync(fs, true);
     },
-    sync: fs => sync(fs, false),
+    sync: save,
+    changed(fs) {
+      timer ??= setTimeout(() => save(fs).catch(() => {}), 100);
+    },
   };
 }
 
-async function openDatabase(dataDir) {
+async function openDatabase({ dataDir, load }) {
   const name = dataDir.startsWith('idb://') ? dataDir.slice(6) : null;
   if (dataDir !== 'memory://' && !name) {
     throw new TypeError('Browser dataDir must be memory:// or idb://name');
@@ -57,7 +70,8 @@ async function openDatabase(dataDir) {
       locateFile: (file, directory) => file === 'mysqld.wasm' ? wasmUrl : directory + file,
       assets: fetchBytes(assetsUrl).then(readAssets),
       storage: name ? indexedDB(name) : undefined,
-      datadir: () => fetchBytes(datadirUrl).then(readDatadir),
+      load,
+      template: () => fetchBytes(datadirUrl),
     });
     return {
       ...engine,
@@ -81,10 +95,11 @@ self.onmessage = async ({ data: { id, op, value } }) => {
     let results;
     if (op === 'create') database = await openDatabase(value);
     else if (op === 'query') results = await database.send(value);
+    else if (op === 'dump') results = await database.dump();
     else if (op === 'persist') await database.persist();
     else if (op === 'close') await database.close();
     else throw new Error('Unknown MySQL worker operation');
-    self.postMessage({ id, results });
+    self.postMessage({ id, results }, results instanceof Uint8Array ? [results.buffer] : []);
   } catch (error) {
     self.postMessage({ id, error: error.message, errno: error.errno, sqlstate: error.sqlstate });
   }

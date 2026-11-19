@@ -14,9 +14,9 @@ async function load(engine) {
     const { MySQL } = await import('mysql-wasm');
     return dataDir => MySQL.create({ dataDir });
   }
-  if (engine === 'mysql-worker') {
-    const { MySQLWorker } = await import('mysql-wasm/worker');
-    return dataDir => MySQLWorker.create({ dataDir });
+  if (engine === 'mysql-process') {
+    const { MySQLProcess } = await import('mysql-wasm/process');
+    return dataDir => MySQLProcess.create({ dataDir });
   }
   const { PGlite } = await import('@electric-sql/pglite');
   return dataDir => PGlite.create({ dataDir, relaxedDurability: false });
@@ -179,7 +179,7 @@ function run(engine, scenario, dataDir) {
 async function main(trials) {
   if (!Number.isInteger(trials) || trials < 1) throw new Error('Usage: node bench/node.mjs [positive trial count]');
   const root = await mkdtemp(join(tmpdir(), 'wasm-db-bench-'));
-  const engines = ['mysql', 'mysql-worker', 'pglite'];
+  const engines = ['mysql', 'mysql-process', 'pglite'];
   const output = Object.fromEntries(engines.map(engine => [engine, { samples: {}, settings: null }]));
   const record = (engine, scenario, sample) => (output[engine].samples[scenario] ??= []).push(sample);
   try {

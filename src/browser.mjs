@@ -1,6 +1,8 @@
 import { Connection } from './connection.mjs';
 import { queryError } from './protocol.mjs';
 
+export { types } from './types.mjs';
+
 function openWorker() {
   const worker = new Worker(new URL('./browser-worker.mjs', import.meta.url), { type: 'module' });
   let sequence = 0;
@@ -39,16 +41,18 @@ function openWorker() {
   };
 }
 
-export class MySQLWorker extends Connection {
-  static async create({ dataDir = 'memory://' } = {}) {
+// Runs MySQL in a dedicated worker, keeping the page responsive.
+export class MySQL extends Connection {
+  static async create({ dataDir = 'memory://', load } = {}) {
     if (!globalThis.crossOriginIsolated) {
       throw new Error('MySQL requires a cross-origin isolated page');
     }
     const worker = openWorker();
     try {
-      await worker.call('create', dataDir);
-      const db = new MySQLWorker({
+      await worker.call('create', { dataDir, load });
+      const db = new MySQL({
         send: (frame) => worker.call('query', frame),
+        dump: () => worker.call('dump'),
         persist: () => worker.call('persist'),
         close: () => worker.call('close'),
       }, worker.terminate);
@@ -65,5 +69,3 @@ export class MySQLWorker extends Connection {
     }
   }
 }
-
-export { MySQLWorker as MySQL };

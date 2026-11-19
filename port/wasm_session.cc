@@ -112,6 +112,7 @@ struct Result {
   std::vector<Field> fields;
   std::vector<Row> rows;
   ulonglong affected = 0;
+  ulonglong insert_id = 0;
 };
 struct Command {
   bool multi = false;
@@ -197,10 +198,11 @@ const st_command_service_cbs callbacks{
       }
       return 0;
     },
-    .handle_ok = [](void *ptr, uint, uint, ulonglong affected, ulonglong, const char *) {
+    .handle_ok = [](void *ptr, uint, uint, ulonglong affected, ulonglong insert_id, const char *) {
       auto &cmd = context(ptr);
       if (!cmd.preparing) {
         cmd.result.affected = affected;
+        cmd.result.insert_id = insert_id;
         cmd.results.push_back(std::move(cmd.result));
         cmd.result = {};
       }
@@ -301,6 +303,8 @@ void respond(const Command &cmd) {
     for (const auto &result : cmd.results) {
       out.StartObject();
       out.Key("affectedRows"); out.Uint64(result.affected);
+      // A string keeps 64-bit IDs exact through JSON.parse.
+      out.Key("insertId"); string(out, std::to_string(result.insert_id));
       out.Key("fields"); out.StartArray();
       for (const auto &field : result.fields) {
         out.StartObject();

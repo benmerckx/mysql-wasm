@@ -1,16 +1,16 @@
 import assert from 'node:assert/strict';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { MySQL } from 'mysql-wasm';
-import { MySQLWorker } from 'mysql-wasm/worker';
+import { MySQLProcess } from 'mysql-wasm/process';
 
-test('MySQL uses native parameters, executes scripts and persists InnoDB rows', async () => {
+test('MySQLProcess uses native parameters, executes scripts and persists InnoDB rows', async () => {
   const dataDir = await mkdtemp(join(tmpdir(), 'mysql-wasm-test-'));
   let db;
   try {
-    db = await MySQL.create({ dataDir });
+    db = await MySQLProcess.create({ dataDir });
     assert.equal((await db.query('SELECT VERSION() AS version')).rows[0].version, '8.4.13');
     const [ddl, write, select] = await db.exec(
       "CREATE TABLE records (id BIGINT PRIMARY KEY, value VARCHAR(128)) ENGINE=InnoDB; INSERT INTO records VALUES (1,'kept'); SELECT id FROM records;",
@@ -23,18 +23,20 @@ test('MySQL uses native parameters, executes scripts and persists InnoDB rows', 
       payload, new Uint8Array([0, 255]), 9223372036854775807n, null, 3.25,
     ]);
     assert.deepEqual(statement.rows, [{
-      str: payload, bytes: new Uint8Array([0, 255]), n: '9223372036854775807',
+      str: payload, bytes: new Uint8Array([0, 255]), n: 9223372036854775807n,
       nil: null, fp: 3.25,
     }]);
     await assert.rejects(db.query('SELECT ?'), { errno: 1064 });
     await assert.rejects(db.query('SELECT ?', []), /parameter count/i);
     await assert.rejects(db.query('SELECT * FROM missing_table'), { errno: 1146, sqlstate: '42S02' });
     await assert.rejects(db.query("SELECT 1; INSERT INTO records VALUES (99,'unexpected')"));
+    let waiting;
     await assert.rejects(db.transaction(async tx => {
-      await assert.rejects(db.query('SELECT 1'), /active transaction/);
+      waiting = db.query('SELECT COUNT(*) AS n FROM records');
       await tx.query('INSERT INTO records VALUES (?, ?)', [2, 'rollback']);
       throw new Error('rollback marker');
     }), /rollback marker/);
+    assert.deepEqual((await waiting).rows, [{ n: 1 }]);
     await db.transaction(tx => tx.query('INSERT INTO records VALUES (?, ?)', [3, payload]));
     const results = await Promise.all([db.query('SELECT 1 AS n'), db.query('SELECT 2 AS n')]);
     assert.deepEqual(results.map(result => result.rows[0].n), [1, 2]);
@@ -88,7 +90,7 @@ test('MySQL uses native parameters, executes scripts and persists InnoDB rows', 
     const persist = db.persist();
     await Promise.all([persist, db.close()]);
 
-    db = await MySQLWorker.create({ dataDir });
+    db = await MySQL.create({ dataDir });
     assert.deepEqual((await db.query('SELECT * FROM records ORDER BY id')).rows, [
       { id: 1, value: 'kept' }, { id: 3, value: payload },
     ]);
@@ -99,22 +101,22 @@ test('MySQL uses native parameters, executes scripts and persists InnoDB rows', 
   }
 });
 
-test('MySQLWorker runs in this process and shares data with MySQL', async () => {
+test('MySQL runs in this process and shares data with MySQLProcess', async () => {
   const dataDir = await mkdtemp(join(tmpdir(), 'mysql-wasm-test-'));
   let db;
   try {
-    db = await MySQLWorker.create();
+    db = await MySQL.create();
     await db.exec('CREATE TABLE t (id INT PRIMARY KEY); INSERT INTO t VALUES (1), (2)');
     assert.deepEqual((await db.query('SELECT COUNT(*) AS n FROM t')).rows, [{ n: 2 }]);
     await db.close();
 
-    db = await MySQLWorker.create({ dataDir });
-    await assert.rejects(MySQLWorker.create({ dataDir }), /EEXIST/);
+    db = await MySQL.create({ dataDir });
+    await assert.rejects(MySQL.create({ dataDir }), /already open/);
     await db.transaction(tx => tx.query('CREATE TABLE t (id INT PRIMARY KEY, value TEXT)'));
     await db.query('INSERT INTO t VALUES (?, ?)', [1, 'worker']);
     await db.close();
 
-    db = await MySQL.create({ dataDir });
+    db = await MySQLProcess.create({ dataDir });
     assert.deepEqual((await db.query('SELECT * FROM t')).rows, [{ id: 1, value: 'worker' }]);
   } finally {
     await db?.close();
@@ -123,7 +125,7 @@ test('MySQLWorker runs in this process and shares data with MySQL', async () => 
 });
 
 test('hashing, AES and random bytes work without TLS', async () => {
-  const db = await MySQLWorker.create();
+  const db = await MySQL.create();
   try {
     const { rows: [row] } = await db.query(`SELECT SHA2('abc', 256) AS sha2, SHA1('abc') AS sha1, MD5('abc') AS md5,
       CAST(AES_DECRYPT(AES_ENCRYPT('secret', 'key'), 'key') AS CHAR) AS aes,
@@ -143,7 +145,7 @@ test('hashing, AES and random bytes work without TLS', async () => {
 test('new databases start from the prebuilt data directory with their own identity', async () => {
   const uuids = [];
   for (let i = 0; i < 2; i++) {
-    const db = await MySQLWorker.create();
+    const db = await MySQL.create();
     try {
       const { rows: [row] } = await db.query('SELECT @@server_uuid AS uuid, @@lower_case_table_names AS names');
       assert.equal(row.names, 0);
@@ -153,4 +155,47 @@ test('new databases start from the prebuilt data directory with their own identi
     }
   }
   assert.notEqual(uuids[0], uuids[1]);
+});
+
+test('results report insert ids, array rows and template queries', async () => {
+  await using db = await MySQL.create();
+  await db.exec('CREATE TABLE items (id INT AUTO_INCREMENT PRIMARY KEY, n BIGINT)');
+  assert.equal((await db.query('INSERT INTO items (n) VALUES (?)', [5])).insertId, 1);
+  assert.equal((await db.sql`INSERT INTO items (n) VALUES (${2n ** 60n})`).insertId, 2);
+  assert.deepEqual((await db.sql`SELECT id, n FROM items WHERE id > ${0} ORDER BY id`).rows, [
+    { id: 1, n: 5 }, { id: 2, n: 2n ** 60n },
+  ]);
+  assert.deepEqual((await db.query('SELECT 1 AS x, 2 AS x', undefined, { rowMode: 'array' })).rows, [[1, 2]]);
+});
+
+test('dump and load copy a database', async () => {
+  const source = await MySQL.create();
+  await source.exec("CREATE TABLE notes (id INT PRIMARY KEY, body TEXT); INSERT INTO notes VALUES (1, 'kept')");
+  const snapshot = await source.dump();
+  await source.close();
+
+  const dataDir = await mkdtemp(join(tmpdir(), 'mysql-wasm-test-'));
+  try {
+    const copy = await MySQL.create({ load: snapshot });
+    assert.deepEqual((await copy.query('SELECT * FROM notes')).rows, [{ id: 1, body: 'kept' }]);
+    await copy.close();
+    await (await MySQL.create({ dataDir })).close();
+    await assert.rejects(MySQL.create({ load: snapshot, dataDir }), /existing data directory/);
+    const child = await MySQLProcess.create();
+    await assert.rejects(child.dump(), /only available/);
+    await child.close();
+  } finally {
+    await rm(dataDir, { recursive: true, force: true });
+  }
+});
+
+test('a lock left by a crashed process is taken over', async () => {
+  const dataDir = await mkdtemp(join(tmpdir(), 'mysql-wasm-test-'));
+  try {
+    await writeFile(join(dataDir, '.mysql-wasm-lock'), '999999');
+    const db = await MySQL.create({ dataDir });
+    await db.close();
+  } finally {
+    await rm(dataDir, { recursive: true, force: true });
+  }
 });
