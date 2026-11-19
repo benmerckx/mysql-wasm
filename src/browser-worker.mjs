@@ -1,10 +1,14 @@
 import createEngine from '../dist/browser/mysqld.js';
+import { readAssets } from './assets.mjs';
 import { prefix, queryError } from './protocol.mjs';
 
-const assets = {
-  'mysqld.wasm': new URL('../dist/mysqld.wasm', import.meta.url).href,
-  'mysqld.data': new URL('../dist/browser/mysqld.data', import.meta.url).href,
-};
+const wasmUrl = new URL('../dist/mysqld.wasm', import.meta.url).href;
+
+async function fetchAssets() {
+  const response = await fetch(new URL('../dist/assets.data', import.meta.url));
+  if (!response.ok) throw new Error(`Could not load MySQL runtime assets (HTTP ${response.status})`);
+  return readAssets(new Uint8Array(await response.arrayBuffer()));
+}
 
 function sync(fs, populate) {
   return new Promise((resolve, reject) => {
@@ -52,7 +56,7 @@ function createRuntime() {
   }
   const module = createEngine({
     noInitialRun: true,
-    locateFile: (name, directory) => assets[name] ?? directory + name,
+    locateFile: (name, directory) => name === 'mysqld.wasm' ? wasmUrl : directory + name,
     print(line) {
       if (!line.startsWith(prefix)) return;
       try {
@@ -114,10 +118,14 @@ async function openDatabase(dataDir) {
     '--innodb-buffer-pool-size=33554432',
     '--innodb-read-io-threads=1', '--innodb-write-io-threads=1', '--innodb-purge-threads=1',
   ];
-  async function prepare() {
+  async function prepare(assets) {
     const runtime = createRuntime();
-    const instance = await runtime.module;
+    const [instance, files] = await Promise.all([runtime.module, assets]);
     const fs = instance.FS;
+    for (const [path, bytes] of files) {
+      fs.mkdirTree('/' + path.slice(0, path.lastIndexOf('/')));
+      fs.writeFile('/' + path, bytes);
+    }
     fs.mkdir(directory);
     if (name) {
       fs.mount(fs.filesystems.IDBFS, {}, directory);
@@ -127,14 +135,15 @@ async function openDatabase(dataDir) {
   }
 
   try {
-    let engine = await prepare();
+    const assets = fetchAssets();
+    let engine = await prepare(assets);
     if (engine.fs.readdir(directory).length === 2) {
       engine.instance.callMain([...args, '--initialize-insecure']);
       await engine.exited;
       let files;
       if (name) await sync(engine.fs, false);
       else files = saveFiles(engine.fs, directory);
-      engine = await prepare();
+      engine = await prepare(assets);
       if (files) for (const [path, bytes] of files) {
         if (bytes === null) engine.fs.mkdir(directory + path);
         else engine.fs.writeFile(directory + path, bytes);

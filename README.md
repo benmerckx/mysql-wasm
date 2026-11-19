@@ -98,10 +98,11 @@ npm test
 npm pack --pack-destination dist
 ```
 
-The build uses native code generators, static wasm64 OpenSSL, and a single
-WASM binary shared by separate Node and browser loaders. The patches apply
-to a generated checkout under `build/sources/`, keeping the MySQL submodule
-at the upstream tag.
+The build uses native code generators and static wasm64 OpenSSL. The
+Node and browser loaders share one WASM binary and one runtime data bundle
+containing MySQL error messages, charset definitions, and ICU data. The
+patches apply to a generated checkout under `build/sources/`, keeping the
+MySQL submodule at the upstream tag.
 
 `./scripts/test-timers` exercises expiry, cancellation, and shutdown of the
 timer dispatcher. The npm tests exercise the JS API and reopen an InnoDB

@@ -1,14 +1,32 @@
 import { spawn } from 'node:child_process';
-import { mkdir, mkdtemp, readdir, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { createInterface } from 'node:readline';
 import { fileURLToPath } from 'node:url';
 
 import { prefix, queryError } from './protocol.mjs';
 import { Connection } from './connection.mjs';
+import { readAssets } from './assets.mjs';
 
 const defaultBuild = fileURLToPath(new URL('../dist/', import.meta.url));
+
+async function prepareAssets(root, scratch) {
+  let bundle;
+  try {
+    bundle = await readFile(join(root, 'assets.data'));
+  } catch (error) {
+    if (error.code === 'ENOENT') return root; // Existing build directories have loose assets.
+    throw error;
+  }
+  const basedir = join(scratch, 'runtime');
+  for (const [path, bytes] of readAssets(bundle)) {
+    const target = join(basedir, path);
+    await mkdir(dirname(target), { recursive: true });
+    await writeFile(target, bytes);
+  }
+  return basedir;
+}
 
 function launch(server, args, initialization = false) {
   const child = spawn(process.execPath, [server, ...args], {
@@ -100,13 +118,14 @@ export class MySQL extends Connection {
       await mkdir(data, { recursive: true, mode: 0o700 });
       await mkdir(lock, { mode: 0o700 });
       locked = true;
+      const basedir = await prepareAssets(root, scratch);
       const args = [
         '--no-defaults',
-        `--basedir=${root}`,
+        `--basedir=${basedir}`,
         ...(process.getuid?.() === 0 ? ['--user=root'] : []),
         `--datadir=${data}`,
-        `--lc-messages-dir=${join(root, 'share')}`,
-        `--character-sets-dir=${join(root, 'share', 'charsets')}`,
+        `--lc-messages-dir=${join(basedir, 'share')}`,
+        `--character-sets-dir=${join(basedir, 'share', 'charsets')}`,
         `--secure-file-priv=${scratch}`,
         `--tmpdir=${scratch}`,
         `--pid-file=${join(scratch, 'mysqld.pid')}`,

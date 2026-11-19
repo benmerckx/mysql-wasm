@@ -39,6 +39,11 @@ test('MySQL uses native parameters, executes scripts and persists InnoDB rows', 
     const results = await Promise.all([db.query('SELECT 1 AS n'), db.query('SELECT 2 AS n')]);
     assert.deepEqual(results.map(result => result.rows[0].n), [1, 2]);
     assert.deepEqual((await db.query("SELECT REGEXP_LIKE('abc', '^a') AS matched")).rows, [{ matched: 1 }]);
+    const namedCharacter = await db.query("SELECT REGEXP_LIKE('α', ?) AS matched", [
+      String.raw`\N{GREEK SMALL LETTER ALPHA}`,
+    ]);
+    assert.deepEqual(namedCharacter.rows, [{ matched: 1 }]);
+    assert.deepEqual((await db.query('SELECT CONVERT(_greek 0xE1 USING utf8mb4) AS word')).rows, [{ word: 'α' }]);
     const types = await db.query(
       "SELECT CAST(_latin1 0xe9 AS CHAR CHARACTER SET latin1) AS word, CAST(1.40 AS DECIMAL(4,2)) AS exact, JSON_OBJECT('key',42) AS j",
     );

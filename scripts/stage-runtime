@@ -12,7 +12,7 @@ if [[ "${1:-}" == --browser ]]; then
     echo 'Stage the matching Node build before the browser build.' >&2
     exit 1
   fi
-  cp "$build_dir/runtime_output_directory"/mysqld.{js,data} "$dist/browser/"
+  cp "$build_dir/runtime_output_directory/mysqld.js" "$dist/browser/"
   exit
 fi
 
@@ -23,6 +23,7 @@ printf '{"type":"commonjs"}\n' > "$dist/runtime_output_directory/package.json"
 cp "$build_dir/share/english/errmsg.sys" "$dist/share/english/"
 cp -R "$source_dir/share/charsets" "$dist/share/"
 cp -R "$source_dir/extra/icu/icudt77l" "$dist/lib/private/"
+node "$root/scripts/pack-assets.mjs" "$dist" "$source_dir" "$build_dir"
 
 mkdir -p "$dist/licenses"
 cp "$source_dir/LICENSE" "$dist/licenses/mysql-server.txt"

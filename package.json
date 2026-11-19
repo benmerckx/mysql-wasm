@@ -26,10 +26,8 @@
     "dist/mysqld.wasm",
     "dist/runtime_output_directory/*.js",
     "dist/runtime_output_directory/package.json",
-    "dist/share",
-    "dist/lib/private",
+    "dist/assets.data",
     "dist/browser/*.js",
-    "dist/browser/*.data",
     "dist/licenses"
   ],
   "scripts": {
