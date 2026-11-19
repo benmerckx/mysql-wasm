@@ -8,6 +8,9 @@ import { fileURLToPath } from 'node:url';
 import { prefix, queryError } from './protocol.mjs';
 import { Connection } from './connection.mjs';
 import { readAssets } from './assets.mjs';
+import { readDatadir } from './datadir.mjs';
+import { caseSensitive, restore } from './disk.mjs';
+import { serverOptions } from './options.mjs';
 
 const defaultBuild = fileURLToPath(new URL('../dist/', import.meta.url));
 
@@ -129,12 +132,14 @@ export class MySQL extends Connection {
         `--secure-file-priv=${scratch}`,
         `--tmpdir=${scratch}`,
         `--pid-file=${join(scratch, 'mysqld.pid')}`,
-        '--skip-networking', '--skip-log-bin',
-        '--innodb-buffer-pool-size=33554432',
-        '--innodb-read-io-threads=1', '--innodb-write-io-threads=1', '--innodb-purge-threads=1',
+        ...serverOptions,
       ];
       if (!(await readdir(data)).some(name => !name.startsWith('.'))) {
-        await launch(server, [...args, '--initialize-insecure'], true).exit;
+        if (await caseSensitive(data)) {
+          await restore(data, await readDatadir(await readFile(join(root, 'datadir.data'))));
+        } else {
+          await launch(server, [...args, '--initialize-insecure'], true).exit;
+        }
       }
       child = launch(server, args);
       await child.ready;

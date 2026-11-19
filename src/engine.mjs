@@ -1,12 +1,11 @@
+import { serverOptions } from './options.mjs';
 import { prefix, queryError } from './protocol.mjs';
 
 const args = [
   '--no-defaults', '--user=root', '--basedir=/',
   '--lc-messages-dir=/share', '--character-sets-dir=/share/charsets',
   '--secure-file-priv=NULL', '--pid-file=/tmp/mysqld.pid',
-  '--skip-networking', '--skip-log-bin',
-  '--innodb-buffer-pool-size=33554432',
-  '--innodb-read-io-threads=1', '--innodb-write-io-threads=1', '--innodb-purge-threads=1',
+  ...serverOptions,
 ];
 
 function createRuntime(createEngine, locateFile) {
@@ -78,6 +77,18 @@ function isEmpty(fs, path) {
   return !fs.readdir(path).some(name => !name.startsWith('.'));
 }
 
+function restore(fs, root, entries) {
+  for (const { path, size, chunks } of entries) {
+    if (size === null) {
+      fs.mkdir(root + '/' + path);
+      continue;
+    }
+    const bytes = new Uint8Array(size);
+    for (const [at, chunk] of chunks) bytes.set(chunk, at);
+    fs.writeFile(root + '/' + path, bytes);
+  }
+}
+
 function saveFiles(fs, root, path = '', files = []) {
   for (const entry of fs.readdir(root + path)) {
     if (entry === '.' || entry === '..') continue;
@@ -94,7 +105,9 @@ function saveFiles(fs, root, path = '', files = []) {
 
 // Runs the server inside this JavaScript realm. `storage` mounts a persistent
 // filesystem at the data directory, or is omitted for in-memory storage.
-export async function openEngine({ createEngine, locateFile, assets, storage }) {
+// `datadir` loads the prebuilt data directory, which needs a case-sensitive
+// filesystem like the in-memory and IndexedDB ones.
+export async function openEngine({ createEngine, locateFile, assets, storage, datadir }) {
   const directory = storage?.directory ?? '/db';
   async function prepare() {
     const runtime = createRuntime(createEngine, locateFile);
@@ -112,7 +125,10 @@ export async function openEngine({ createEngine, locateFile, assets, storage }) 
   // A runtime cannot call main twice, so initialization uses its own instance.
   let engine = await prepare();
   const serverArgs = [...args, `--datadir=${directory}`];
-  if (isEmpty(engine.fs, directory)) {
+  const empty = isEmpty(engine.fs, directory);
+  if (empty && datadir) {
+    restore(engine.fs, directory, await datadir());
+  } else if (empty) {
     engine.instance.callMain([...serverArgs, '--initialize-insecure']);
     await engine.exited;
     let files;

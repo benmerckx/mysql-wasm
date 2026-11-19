@@ -121,3 +121,18 @@ test('MySQLWorker runs in this process and shares data with MySQL', async () => 
     await rm(dataDir, { recursive: true, force: true });
   }
 });
+
+test('new databases start from the prebuilt data directory with their own identity', async () => {
+  const uuids = [];
+  for (let i = 0; i < 2; i++) {
+    const db = await MySQLWorker.create();
+    try {
+      const { rows: [row] } = await db.query('SELECT @@server_uuid AS uuid, @@lower_case_table_names AS names');
+      assert.equal(row.names, 0);
+      uuids.push(row.uuid);
+    } finally {
+      await db.close();
+    }
+  }
+  assert.notEqual(uuids[0], uuids[1]);
+});

@@ -1,12 +1,15 @@
-import { mkdir, readFile, rm } from 'node:fs/promises';
+import { mkdir, readdir, readFile, rm } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { readAssets } from './assets.mjs';
 import { Connection } from './connection.mjs';
+import { readDatadir } from './datadir.mjs';
+import { caseSensitive, restore } from './disk.mjs';
 import { openEngine } from './engine.mjs';
 
 const dist = new URL('../dist/', import.meta.url);
+const datadir = () => readFile(new URL('datadir.data', dist)).then(readDatadir);
 
 function nodeFileSystem(path) {
   return {
@@ -38,12 +41,17 @@ export class MySQLWorker extends Connection {
         await mkdir(path, { recursive: true, mode: 0o700 });
         await mkdir(lock, { mode: 0o700 });
         locked = true;
+        // Writing it here rather than through NODEFS keeps the files sparse.
+        if (!(await readdir(path)).some(name => !name.startsWith('.')) && await caseSensitive(path)) {
+          await restore(path, await datadir());
+        }
       }
       const engine = await openEngine({
         createEngine,
         locateFile: file => fileURLToPath(new URL(file === 'mysqld.wasm' ? file : 'browser/' + file, dist)),
         assets: readFile(new URL('assets.data', dist)).then(readAssets),
         storage: path ? nodeFileSystem(path) : undefined,
+        datadir: path ? undefined : datadir,
       });
       const db = new MySQLWorker(engine, cleanup);
       try {

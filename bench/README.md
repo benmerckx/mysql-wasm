@@ -66,6 +66,7 @@ Each file is compressed independently at Brotli quality 11. Summing those
 sizes models HTTP transfer with Brotli. The benchmark page, npm packaging,
 source maps, and unrequested optional modules are outside the download totals.
 
-`results/` holds the reported runs on an Apple M4: `node.json` with Node
-24.16.0 at commit 3696c57, and `chrome.json` with Chrome 157 at d2ffd15,
-before the browser runtime also targeted Node.
+`results/` holds the reported runs on an Apple M4 with Node 24.16.0 and
+Chrome 157, both using the prebuilt data directory. Fresh filesystem trials
+on macOS still run `--initialize-insecure`, because the volume is
+case-insensitive.

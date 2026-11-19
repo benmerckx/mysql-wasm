@@ -5,6 +5,7 @@ for (const file of [
   'browser/mysqld.js',
   'mysqld.wasm',
   'assets.data',
+  'datadir.data',
   'licenses/mysql-server.txt',
   'licenses/openssl.txt',
   'runtime_output_directory/package.json',

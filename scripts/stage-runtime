@@ -30,6 +30,9 @@ while IFS= read -r file; do
   cp "$source_dir/extra/icu/icudt77l/$file" "$icu_dir/$file"
 done < "$root/scripts/icu-regex-assets.txt"
 node "$root/scripts/pack-assets.mjs" "$dist" "$source_dir" "$build_dir"
+# MySQL refuses the template's lower_case_table_names=0 on a case-insensitive
+# build host, so this step needs a case-sensitive TMPDIR.
+node "$root/scripts/make-datadir.mjs" "$dist"
 
 mkdir -p "$dist/licenses"
 cp "$source_dir/LICENSE" "$dist/licenses/mysql-server.txt"

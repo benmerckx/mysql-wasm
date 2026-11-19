@@ -1,13 +1,18 @@
 import createEngine from '../dist/browser/mysqld.js';
 import { readAssets } from './assets.mjs';
+import { readDatadir } from './datadir.mjs';
 import { openEngine } from './engine.mjs';
 
 const wasmUrl = new URL('../dist/mysqld.wasm', import.meta.url).href;
 
-async function fetchAssets() {
-  const response = await fetch(new URL('../dist/assets.data', import.meta.url));
-  if (!response.ok) throw new Error(`Could not load MySQL runtime assets (HTTP ${response.status})`);
-  return readAssets(new Uint8Array(await response.arrayBuffer()));
+// Bundlers only pick up assets from literal `new URL(..., import.meta.url)`.
+const assetsUrl = new URL('../dist/assets.data', import.meta.url);
+const datadirUrl = new URL('../dist/datadir.data', import.meta.url);
+
+async function fetchBytes(url) {
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(`Could not load ${url} (HTTP ${response.status})`);
+  return new Uint8Array(await response.arrayBuffer());
 }
 
 function sync(fs, populate) {
@@ -50,8 +55,9 @@ async function openDatabase(dataDir) {
     const engine = await openEngine({
       createEngine,
       locateFile: (file, directory) => file === 'mysqld.wasm' ? wasmUrl : directory + file,
-      assets: fetchAssets(),
+      assets: fetchBytes(assetsUrl).then(readAssets),
       storage: name ? indexedDB(name) : undefined,
+      datadir: () => fetchBytes(datadirUrl).then(readDatadir),
     });
     return {
       ...engine,

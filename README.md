@@ -74,6 +74,18 @@ MySQL 8.4 and return an error in this build.
 The Archive, Blackhole, and Federated storage engines are omitted, along with
 the ngram full-text parser and the legacy `mysql_native_password` plugin.
 
+The server runs with embedded-sized buffers: a 32 MB buffer pool, 8 MB redo
+capacity, 1 MB log buffer, and 64 MB of TempTable memory. TLS is disabled and
+no certificates or RSA keys are generated.
+
+New databases start from a prebuilt data directory (`dist/datadir.data`)
+instead of running `mysqld --initialize-insecure`. It is used for in-memory
+and IndexedDB storage and for case-sensitive filesystems. On case-insensitive
+filesystems, such as most macOS volumes, MySQL requires
+`lower_case_table_names=2`, so new data directories there are still
+initialized on first start. Building the package therefore needs a
+case-sensitive temporary directory.
+
 The `ST_*` spatial functions and `MBR*` predicates are omitted. Geometry
 columns, spatial indexes, and constructors such as `POINT(x, y)` are
 available. New databases include spatial reference IDs 0, 3857, and 4326.

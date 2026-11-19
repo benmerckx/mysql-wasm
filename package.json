@@ -27,6 +27,7 @@
     "dist/runtime_output_directory/*.js",
     "dist/runtime_output_directory/package.json",
     "dist/assets.data",
+    "dist/datadir.data",
     "dist/browser/*.js",
     "dist/licenses"
   ],
