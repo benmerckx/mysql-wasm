@@ -27,8 +27,12 @@ if [[ ! -d "$openssl/.git" ]]; then
   git clone --depth 1 --branch openssl-3.5.9 https://github.com/openssl/openssl.git "$openssl"
 fi
 cd "$openssl"
+# OpenSSL's make rules do not rebuild existing objects when CFLAGS change.
+if [[ -f Makefile ]] && ! grep -Eq '^CFLAGS=(.* )?-Oz( |$)' Makefile; then
+  make clean
+fi
 CC=emcc CXX=em++ AR=emar RANLIB=emranlib ./Configure linux-generic64 \
-  -m64 -pthread no-asm no-shared no-tests no-module no-dso no-apps \
+  -Oz -m64 -pthread no-asm no-shared no-tests no-module no-dso no-apps \
   no-async no-afalgeng no-ktls no-quic --prefix="$prefix" --libdir=lib
 make -j"$jobs" build_sw
 make install_sw

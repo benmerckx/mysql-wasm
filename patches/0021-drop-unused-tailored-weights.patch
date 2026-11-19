@@ -1,0 +1,49 @@
+--- a/strings/ctype-uca.cc
++++ b/strings/ctype-uca.cc
+@@ -4090,6 +4090,8 @@
+   }
+ }
+ 
++// The compact build does not register the Japanese or Chinese collations.
++#ifndef __EMSCRIPTEN__
+ static void copy_ja_han_pages(const CHARSET_INFO *cs, MY_UCA_INFO *dst) {
+   if (!cs->uca || cs->uca->version != UCA_V900 ||
+       cs->coll_param != &ja_coll_param)
+@@ -4219,6 +4221,8 @@
+   }
+ }
+ 
++#endif
++
+ static bool init_weight_level(CHARSET_INFO *cs, MY_COLL_RULES *rules, int level,
+                               MY_UCA_INFO *dst, const MY_UCA_INFO *src) {
+   MY_COLL_RULE *r, *rlast;
+@@ -4281,6 +4285,7 @@
+     dst->contraction_nodes = new std::vector<MY_CONTRACTION>(0);
+     dst->contraction_flags = new std::array<char, MY_UCA_CNT_FLAG_SIZE>{};
+   }
++#ifndef __EMSCRIPTEN__
+   if (cs->coll_param == &zh_coll_param) {
+     /*
+       We are going to reorder the weight of characters in uca pages when
+@@ -4296,7 +4301,9 @@
+     }
+     modify_all_zh_pages(cs->coll_param->reorder_param, dst, npages);
+     copy_zh_han_pages(dst, loader);
+-  } else {
++  } else
++#endif
++  {
+     /* Allocate pages that we'll overwrite and copy default weights */
+     for (i = 0; i < npages; i++) {
+       bool rc;
+@@ -4309,7 +4316,9 @@
+         return rc;
+     }
+ 
++#ifndef __EMSCRIPTEN__
+     copy_ja_han_pages(cs, dst);
++#endif
+   }
+ 
+   /*
