@@ -1,0 +1,34 @@
+--- a/strings/collations_internal.cc
++++ b/strings/collations_internal.cc
+@@ -281,6 +281,23 @@
+ extern CHARSET_INFO my_charset_gb18030_unicode_520_ci;
+ 
+ static CHARSET_INFO *hardcoded_charsets[] = {
++#ifdef __EMSCRIPTEN__
++    &my_charset_bin,
++    &my_charset_latin1,
++    &my_charset_latin1_bin,
++    &my_charset_utf8mb3_general_ci,
++    &my_charset_utf8mb3_tolower_ci,
++    &my_charset_utf8mb3_bin,
++    &my_charset_utf8mb4_0900_bin,
++    &my_charset_utf8mb4_bin,
++    &my_charset_utf8mb4_general_ci,
++    &my_charset_utf8mb4_0900_ai_ci,
++    &my_charset_utf8mb4_0900_as_ci,
++    &my_charset_utf8mb4_0900_as_cs,
++    &my_charset_utf8mb4_unicode_ci,
++    &my_charset_utf16le_general_ci,
++    &my_charset_utf16le_bin,
++#else
+     &my_charset_bin,
+ 
+     &my_charset_latin1,
+@@ -526,6 +543,7 @@
+     &my_charset_utf32_sinhala_uca_ci,
+     &my_charset_utf32_unicode_520_ci,
+     &my_charset_utf32_vietnamese_ci,
++#endif
+ };
+ 
+ namespace {

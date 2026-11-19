@@ -1,0 +1,57 @@
+--- a/sql/CMakeLists.txt
++++ b/sql/CMakeLists.txt
+@@ -746,6 +746,10 @@
+     )
+ ENDIF()
+ 
++IF(EMSCRIPTEN)
++  LIST(APPEND SQL_SHARED_SOURCES wasm_session.cc)
++ENDIF()
++
+ IF(LINUX)
+   LIST(APPEND SQL_SHARED_SOURCES
+     resourcegroups/platform/thread_attrs_api_linux.cc)
+--- a/sql/mysqld.cc
++++ b/sql/mysqld.cc
+@@ -9851,16 +9851,9 @@
+   /*
+     Invoke the bootstrap thread, if required.
+   */
+-#ifdef __EMSCRIPTEN__
+-  // The wasm64 CLI runs initialization or a single SQL batch offline.
+-  if (!opt_initialize && (!opt_init_file || !*opt_init_file)) {
+-    fprintf(stderr, "The WASM server requires --initialize-insecure or --init-file.\n");
+-    unireg_abort(MYSQLD_ABORT_EXIT);
+-  }
+-#endif
+   process_bootstrap();
+ #ifdef __EMSCRIPTEN__
+-  unireg_abort(MYSQLD_SUCCESS_EXIT);
++  if (opt_init_file) unireg_abort(MYSQLD_SUCCESS_EXIT);
+ #endif
+ 
+   /* Initialize command maps */
+@@ -9945,7 +9938,10 @@
+ 
+   (void)RUN_HOOK(server_state, before_handle_connection, (nullptr));
+ 
+-#if defined(_WIN32)
++#if defined(__EMSCRIPTEN__)
++  extern bool mysql_wasm_run_session();
++  const bool wasm_session_ok = mysql_wasm_run_session();
++#elif defined(_WIN32)
+   if (mysqld_socket_acceptor != nullptr)
+     mysqld_socket_acceptor->check_and_spawn_admin_connection_handler_thread();
+   setup_conn_event_handler_threads();
+@@ -10030,7 +10026,11 @@
+ #endif  // _WIN32
+ 
+   clean_up(true);
++#ifdef __EMSCRIPTEN__
++  mysqld_exit(wasm_session_ok ? MYSQLD_SUCCESS_EXIT : MYSQLD_ABORT_EXIT);
++#else
+   mysqld_exit(signal_hand_thr_exit_code);
++#endif
+ }
+ 
+ /****************************************************************************

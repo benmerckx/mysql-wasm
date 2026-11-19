@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+root="$(cd "$(dirname "$0")/.." && pwd)"
+source_dir="${MYSQL_WASM_SOURCE_DIR:-$("$root/scripts/prepare-source")}"
+build_dir="${MYSQL_WASM_BUILD_DIR:-$root/build/emscripten/$(basename "$source_dir")}"
+dist="$root/dist"
+
+if [[ "${1:-}" == --browser ]]; then
+  mkdir -p "$dist/browser"
+  if ! cmp -s "$build_dir/runtime_output_directory/mysqld.wasm" "$dist/mysqld.wasm"; then
+    echo 'Stage the matching Node build before the browser build.' >&2
+    exit 1
+  fi
+  cp "$build_dir/runtime_output_directory"/mysqld.{js,data} "$dist/browser/"
+  exit
+fi
+
+mkdir -p "$dist/runtime_output_directory" "$dist/share/english" "$dist/lib/private"
+cp "$build_dir/runtime_output_directory/mysqld.js" "$dist/runtime_output_directory/"
+cp "$build_dir/runtime_output_directory/mysqld.wasm" "$dist/"
+printf '{"type":"commonjs"}\n' > "$dist/runtime_output_directory/package.json"
+cp "$build_dir/share/english/errmsg.sys" "$dist/share/english/"
+cp -R "$source_dir/share/charsets" "$dist/share/"
+cp -R "$source_dir/extra/icu/icudt77l" "$dist/lib/private/"
+
+mkdir -p "$dist/licenses"
+cp "$source_dir/LICENSE" "$dist/licenses/mysql-server.txt"
+cp "${OPENSSL_SOURCE_DIR:-$root/build/openssl}/LICENSE.txt" "$dist/licenses/openssl.txt"

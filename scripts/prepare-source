@@ -10,11 +10,13 @@ fi
 
 revision="$(git -C "$upstream" rev-parse HEAD)"
 patches=("$root"/patches/*.patch)
-backend="$root/port/emscripten_timers.cc"
+timer="$root/port/emscripten_timers.cc"
+session="$root/port/wasm_session.cc"
+node_assets="$root/port/node-assets.js"
 fingerprint="$(
   {
     printf '%s\n' "$revision"
-    git hash-object "${patches[@]}" "$backend"
+    git hash-object "${patches[@]}" "$timer" "$session" "$node_assets"
   } | git hash-object --stdin
 )"
 destination="$root/build/sources/$fingerprint"
@@ -26,7 +28,8 @@ if [[ ! -d "$destination" ]]; then
   for patch in "${patches[@]}"; do
     patch -d "$staging" -p1 --forward < "$patch" >&2
   done
-  cp "$backend" "$staging/mysys/"
+  cp "$timer" "$staging/mysys/"
+  cp "$session" "$node_assets" "$staging/sql/"
   mv "$staging" "$destination"
 fi
 printf '%s\n' "$destination"

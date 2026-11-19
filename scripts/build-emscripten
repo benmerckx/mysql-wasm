@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+root="$(cd "$(dirname "$0")/.." && pwd)"
+source_dir="$("$root/scripts/prepare-source")"
+build_dir="$root/build/emscripten/$(basename "$source_dir")"
+jobs="${JOBS:-4}"
+
+for browser in OFF ON; do
+  "$root/scripts/configure-emscripten" "$@" -DMYSQL_WASM_BROWSER="$browser"
+  cmake --build "$build_dir" --target mysqld --parallel "$jobs"
+  if [[ "$browser" == ON ]]; then
+    "$root/scripts/stage-runtime" --browser
+  else
+    "$root/scripts/stage-runtime"
+  fi
+done

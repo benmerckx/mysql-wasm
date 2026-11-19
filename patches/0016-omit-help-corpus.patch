@@ -1,0 +1,15 @@
+--- a/sql/sql_initialize.cc
++++ b/sql/sql_initialize.cc
+@@ -38,7 +38,12 @@
+ #include "mysql/my_loglevel.h"
+ #include "mysql/strings/m_ctype.h"
+ #include "mysqld_error.h"
++#ifdef __EMSCRIPTEN__
++// The compact build keeps the help tables, with no bundled help corpus.
++const char *fill_help_tables[] = {nullptr};
++#else
+ #include "scripts/sql_commands_help_data.h"
++#endif
+ #include "scripts/sql_commands_system_data.h"
+ #include "scripts/sql_commands_system_tables.h"
+ #include "scripts/sql_commands_system_users.h"

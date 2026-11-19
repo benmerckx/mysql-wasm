@@ -1,0 +1,27 @@
+--- a/sql/CMakeLists.txt
++++ b/sql/CMakeLists.txt
+@@ -1124,8 +1124,23 @@
+   )
+ 
+ IF(EMSCRIPTEN)
++  OPTION(MYSQL_WASM_BROWSER "Build the browser worker runtime" OFF)
++  IF(MYSQL_WASM_BROWSER)
++    TARGET_LINK_OPTIONS(mysqld PRIVATE
++      -sENVIRONMENT=web,worker -sNODERAWFS=0 -sMODULARIZE=1 -sEXPORT_ES6=1
++      -sEXPORTED_RUNTIME_METHODS=callMain,ccall,FS -sFORCE_FILESYSTEM=1
++      -lidbfs.js
++      "SHELL:--preload-file ${CMAKE_BINARY_DIR}/share/english@/share/english"
++      "SHELL:--preload-file ${CMAKE_SOURCE_DIR}/share/charsets@/share/charsets"
++      "SHELL:--preload-file ${CMAKE_SOURCE_DIR}/extra/icu/icudt77l@/lib/private/icudt77l")
++  ELSE()
++    TARGET_LINK_OPTIONS(mysqld PRIVATE -sENVIRONMENT=node -sNODERAWFS=1
++      "SHELL:--pre-js ${CMAKE_CURRENT_SOURCE_DIR}/node-assets.js")
++    SET_PROPERTY(TARGET mysqld APPEND PROPERTY LINK_DEPENDS
++      "${CMAKE_CURRENT_SOURCE_DIR}/node-assets.js")
++  ENDIF()
+   TARGET_LINK_OPTIONS(mysqld PRIVATE
+-    -Oz -sENVIRONMENT=node -sNODERAWFS=1 -sEXIT_RUNTIME=1
++    -Oz -sEXIT_RUNTIME=1
+     -sPROXY_TO_PTHREAD=1 -sPTHREAD_POOL_SIZE=24 -sPTHREAD_POOL_SIZE_STRICT=2
+     -sALLOW_MEMORY_GROWTH=1 -sINITIAL_MEMORY=268435456 -sSTACK_SIZE=2097152)
+ ENDIF()

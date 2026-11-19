@@ -1,0 +1,47 @@
+{
+  "name": "mysql-wasm",
+  "version": "0.1.0",
+  "description": "MySQL Community Server 8.4 compiled to WebAssembly",
+  "type": "module",
+  "exports": {
+    ".": {
+      "browser": {
+        "types": "./src/browser.d.ts",
+        "import": "./src/browser.mjs"
+      },
+      "types": "./src/index.d.ts",
+      "import": "./src/index.mjs"
+    },
+    "./worker": {
+      "browser": {
+        "types": "./src/browser.d.ts",
+        "import": "./src/browser.mjs"
+      },
+      "types": "./src/worker.d.ts",
+      "import": "./src/worker.mjs"
+    }
+  },
+  "files": [
+    "src",
+    "dist/mysqld.wasm",
+    "dist/runtime_output_directory/*.js",
+    "dist/runtime_output_directory/package.json",
+    "dist/share",
+    "dist/lib/private",
+    "dist/browser/*.js",
+    "dist/browser/*.data",
+    "dist/licenses"
+  ],
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "prepack": "node scripts/check-package.mjs"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/benmerckx/mysql-wasm.git"
+  },
+  "license": "GPL-2.0-only"
+}

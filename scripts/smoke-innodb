@@ -3,7 +3,11 @@ set -euo pipefail
 
 root="$(cd "$(dirname "$0")/.." && pwd)"
 source_dir="${MYSQL_WASM_SOURCE_DIR:-$("$root/scripts/prepare-source")}"
-build_dir="${MYSQL_WASM_BUILD_DIR:-$root/build/emscripten/$(basename "$source_dir")}"
+default_build="$root/build/emscripten/$(basename "$source_dir")"
+if [[ -f "$root/dist/runtime_output_directory/mysqld.js" ]]; then
+  default_build="$root/dist"
+fi
+build_dir="${MYSQL_WASM_BUILD_DIR:-$default_build}"
 server="$build_dir/runtime_output_directory/mysqld.js"
 
 if [[ ! -f "$server" ]]; then
