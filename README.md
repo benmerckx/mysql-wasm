@@ -75,8 +75,10 @@ The Archive, Blackhole, and Federated storage engines are omitted, along with
 the ngram full-text parser and the legacy `mysql_native_password` plugin.
 
 The server runs with embedded-sized buffers: a 32 MB buffer pool, 8 MB redo
-capacity, 1 MB log buffer, and 64 MB of TempTable memory. TLS is disabled and
-no certificates or RSA keys are generated.
+capacity, 1 MB log buffer, and 64 MB of TempTable memory. TLS is not built:
+the server links stubs instead of OpenSSL's libssl and generates no
+certificates or RSA keys. OpenSSL's libcrypto still provides hashing, AES and
+random bytes, built without unused algorithms such as DES, DSA, RC4 and SM2.
 
 New databases start from a prebuilt data directory (`dist/datadir.data`)
 instead of running `mysqld --initialize-insecure`. It is used for in-memory

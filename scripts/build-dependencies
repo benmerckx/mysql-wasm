@@ -27,12 +27,30 @@ if [[ ! -d "$openssl/.git" ]]; then
   git clone --depth 1 --branch openssl-3.5.9 https://github.com/openssl/openssl.git "$openssl"
 fi
 cd "$openssl"
-# OpenSSL's make rules do not rebuild existing objects when CFLAGS change.
-if [[ -f Makefile ]] && ! grep -Eq '^CFLAGS=(.* )?-Oz( |$)' Makefile; then
+# Only libcrypto is linked, for hashing, AES and random bytes. The default
+# provider registers every algorithm it is built with, so unused ones go.
+options=(
+  -Oz -m64 -pthread no-asm no-shared no-tests no-module no-dso no-apps
+  no-async no-afalgeng no-ktls no-quic no-err no-engine no-comp no-ocsp
+  no-cms no-ts no-srp no-ct no-cmp no-dtls no-srtp no-ssl3 no-tls1 no-tls1_1
+  no-psk no-idea no-camellia no-seed no-rc2 no-rc4 no-rc5 no-md4 no-mdc2
+  no-whirlpool no-sm2 no-sm3 no-sm4 no-aria no-bf no-cast no-des no-dsa
+  no-gost no-siphash no-ec2m no-scrypt no-ocb no-legacy no-ui-console no-http
+  no-ssl-trace no-autoload-config no-padlockeng
+)
+# OpenSSL's make rules do not rebuild existing objects when options change.
+stamp="$openssl/.mysql-wasm-options"
+if [[ -f Makefile && "$(cat "$stamp" 2>/dev/null)" != "${options[*]}" ]]; then
   make clean
 fi
 CC=emcc CXX=em++ AR=emar RANLIB=emranlib ./Configure linux-generic64 \
-  -Oz -m64 -pthread no-asm no-shared no-tests no-module no-dso no-apps \
-  no-async no-afalgeng no-ktls no-quic --prefix="$prefix" --libdir=lib
+  "${options[@]}" --prefix="$prefix" --libdir=lib
+printf '%s' "${options[*]}" > "$stamp"
 make -j"$jobs" build_sw
 make install_sw
+
+# The server's remaining TLS calls link against stubs instead of libssl.
+emcc -Oz -m64 -pthread -Wall -Wno-unused-parameter -Werror \
+  -I"$prefix/include" -c "$root/port/ssl_stubs.c" -o "$prefix/lib/ssl_stubs.o"
+rm -f "$prefix/lib/libssl_stubs.a"
+emar rcs "$prefix/lib/libssl_stubs.a" "$prefix/lib/ssl_stubs.o"

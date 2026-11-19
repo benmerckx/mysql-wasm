@@ -122,6 +122,24 @@ test('MySQLWorker runs in this process and shares data with MySQL', async () => 
   }
 });
 
+test('hashing, AES and random bytes work without TLS', async () => {
+  const db = await MySQLWorker.create();
+  try {
+    const { rows: [row] } = await db.query(`SELECT SHA2('abc', 256) AS sha2, SHA1('abc') AS sha1, MD5('abc') AS md5,
+      CAST(AES_DECRYPT(AES_ENCRYPT('secret', 'key'), 'key') AS CHAR) AS aes,
+      LENGTH(RANDOM_BYTES(16)) AS random, @@tls_version AS tls`);
+    assert.deepEqual(row, {
+      sha2: 'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad',
+      sha1: 'a9993e364706816aba3e25717850c26c9cd0d89d',
+      md5: '900150983cd24fb0d6963f7d28e17f72',
+      aes: 'secret', random: 16, tls: '',
+    });
+    await db.exec("CREATE USER reader IDENTIFIED BY 'secret'");
+  } finally {
+    await db.close();
+  }
+});
+
 test('new databases start from the prebuilt data directory with their own identity', async () => {
   const uuids = [];
   for (let i = 0; i < 2; i++) {

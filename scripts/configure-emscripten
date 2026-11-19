@@ -9,7 +9,7 @@ fi
 
 ssl="${OPENSSL_WASM64_ROOT:-$root/build/openssl-wasm64}"
 comp_err="${MYSQL_WASM_COMP_ERR:-$root/build/native/runtime_output_directory/comp_err}"
-if [[ ! -f "$ssl/lib/libssl.a" || ! -f "$ssl/lib/libcrypto.a" || ! -x "$comp_err" ||
+if [[ ! -f "$ssl/lib/libssl_stubs.a" || ! -f "$ssl/lib/libcrypto.a" || ! -x "$comp_err" ||
       ! -x "$(dirname "$comp_err")/uca9dump" ||
       ! -x "$(dirname "$comp_err")/comp_sql" ]]; then
   echo 'Build target OpenSSL and the native generators with ./scripts/build-dependencies.' >&2
@@ -31,7 +31,7 @@ exec emcmake cmake -S "$source_dir" -B "$build_dir" -G Ninja \
   -DWITH_SSL="$ssl" \
   -DOPENSSL_ROOT_DIR="$ssl" \
   -DOPENSSL_INCLUDE_DIR="$ssl/include" \
-  -DOPENSSL_LIBRARY="$ssl/lib/libssl.a" \
+  -DOPENSSL_LIBRARY="$ssl/lib/libssl_stubs.a" \
   -DCRYPTO_LIBRARY="$ssl/lib/libcrypto.a" \
   -DCMAKE_EXE_LINKER_FLAGS="-Oz -sNODERAWFS=1 -sALLOW_MEMORY_GROWTH=1" \
   -Dprotobuf_BUILD_SHARED_LIBS=OFF \
