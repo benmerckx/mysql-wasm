@@ -13,10 +13,12 @@ patches=("$root"/patches/*.patch)
 timer="$root/port/emscripten_timers.cc"
 session="$root/port/wasm_session.cc"
 node_assets="$root/port/node-assets.js"
+browser_externs="$root/port/browser-closure-externs.js"
+node_externs="$root/port/node-closure-externs.js"
 fingerprint="$(
   {
     printf '%s\n' "$revision"
-    git hash-object "${patches[@]}" "$timer" "$session" "$node_assets"
+    git hash-object "${patches[@]}" "$timer" "$session" "$node_assets" "$browser_externs" "$node_externs"
   } | git hash-object --stdin
 )"
 destination="$root/build/sources/$fingerprint"
@@ -29,7 +31,7 @@ if [[ ! -d "$destination" ]]; then
     patch -d "$staging" -p1 --forward < "$patch" >&2
   done
   cp "$timer" "$staging/mysys/"
-  cp "$session" "$node_assets" "$staging/sql/"
+  cp "$session" "$node_assets" "$browser_externs" "$node_externs" "$staging/sql/"
   mv "$staging" "$destination"
 fi
 printf '%s\n' "$destination"

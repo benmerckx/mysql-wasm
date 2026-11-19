@@ -1,0 +1,20 @@
+--- a/sql/CMakeLists.txt
++++ b/sql/CMakeLists.txt
+@@ -1140,13 +1140,17 @@
+       -sENVIRONMENT=web,worker -sNODERAWFS=0 -sMODULARIZE=1 -sEXPORT_ES6=1
+       -sEXPORTED_RUNTIME_METHODS=callMain,ccall,FS -sFORCE_FILESYSTEM=1
+       -lidbfs.js)
++    SET(closure_externs "${CMAKE_CURRENT_SOURCE_DIR}/browser-closure-externs.js")
+   ELSE()
++    SET(closure_externs "${CMAKE_CURRENT_SOURCE_DIR}/node-closure-externs.js")
+     TARGET_LINK_OPTIONS(mysqld PRIVATE -sENVIRONMENT=node -sNODERAWFS=1
+       "SHELL:--pre-js ${CMAKE_CURRENT_SOURCE_DIR}/node-assets.js")
+     SET_PROPERTY(TARGET mysqld APPEND PROPERTY LINK_DEPENDS
+       "${CMAKE_CURRENT_SOURCE_DIR}/node-assets.js")
+   ENDIF()
++  SET_PROPERTY(TARGET mysqld APPEND PROPERTY LINK_DEPENDS "${closure_externs}")
+   TARGET_LINK_OPTIONS(mysqld PRIVATE
++    --closure=1 "--closure-args=--externs='${closure_externs}'"
+     -Oz -sEXIT_RUNTIME=1
+     -sPROXY_TO_PTHREAD=1 -sPTHREAD_POOL_SIZE=24 -sPTHREAD_POOL_SIZE_STRICT=2
+     -sALLOW_MEMORY_GROWTH=1 -sINITIAL_MEMORY=268435456 -sSTACK_SIZE=2097152)

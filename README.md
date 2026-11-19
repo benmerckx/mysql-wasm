@@ -92,8 +92,9 @@ pin. The upstream license is in [upstream/mysql-server/LICENSE](upstream/mysql-s
 ## Build and package
 
 Use Linux with CMake, Ninja, GNU Make, Perl, Bison, a native C/C++ toolchain,
-native OpenSSL and ncurses development headers, Emscripten 6.0.9, and
-Node.js 24. Activate the Emscripten SDK, then run:
+native OpenSSL and ncurses development headers, Emscripten 6.0.9,
+Java for the SDK’s Closure Compiler, and Node.js 24. Activate the Emscripten
+SDK, then run:
 
 ```sh
 ./scripts/build-dependencies
