@@ -1,0 +1,85 @@
+name: release
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: Publish to npm (otherwise build, test and pack only)
+        type: boolean
+        default: false
+
+permissions:
+  contents: write # attach the tarball to the release
+  id-token: write # npm trusted publishing and provenance
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    # A clean build compiles MySQL and OpenSSL to wasm twice over.
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Check the release tag matches package.json
+        if: github.event_name == 'release'
+        run: |
+          version="$(node -p 'require("./package.json").version')"
+          if [[ "$GITHUB_REF_NAME" != "v$version" ]]; then
+            echo "Tag $GITHUB_REF_NAME does not match package.json version $version" >&2
+            exit 1
+          fi
+
+      - name: Install build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            ninja-build bison pkg-config libssl-dev libncurses-dev
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+
+      - name: Install Emscripten
+        run: |
+          git clone --depth 1 https://github.com/emscripten-core/emsdk.git "$RUNNER_TEMP/emsdk"
+          "$RUNNER_TEMP/emsdk/emsdk" install 6.0.9
+          "$RUNNER_TEMP/emsdk/emsdk" activate 6.0.9
+
+      - name: Build
+        run: |
+          source "$RUNNER_TEMP/emsdk/emsdk_env.sh"
+          export JOBS="$(nproc)"
+          ./scripts/build-dependencies
+          ./scripts/build-emscripten
+
+      - name: Test
+        run: |
+          npm ci
+          npm test
+          ./scripts/smoke-innodb
+
+      - name: Pack
+        run: npm pack --pack-destination "$RUNNER_TEMP"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mysql-wasm
+          path: ${{ runner.temp }}/mysql-wasm-*.tgz
+          retention-days: 14
+
+      - name: Publish to npm
+        if: github.event_name == 'release' || inputs.publish
+        # Trusted publishing exchanges the workflow's OIDC token for npm
+        # credentials, so no npm token is stored in the repository.
+        run: npm publish "$RUNNER_TEMP"/mysql-wasm-*.tgz --access public --provenance
+
+      - name: Attach to the GitHub release
+        if: github.event_name == 'release'
+        run: gh release upload "$GITHUB_REF_NAME" "$RUNNER_TEMP"/mysql-wasm-*.tgz --clobber
+        env:
+          GH_TOKEN: ${{ github.token }}
