@@ -1,0 +1,789 @@
+--- a/include/mysql/psi/mysql_cond.h
++++ b/include/mysql/psi/mysql_cond.h
+@@ -72,7 +72,12 @@
+ 
+ #define mysql_cond_init(K, C) mysql_cond_init_with_src(K, C, __FILE__, __LINE__)
+ 
++#ifdef HAVE_PSI_COND_INTERFACE
+ #define mysql_cond_init_with_src(K, C, F, L) inline_mysql_cond_init(K, C, F, L)
++#else
++#define mysql_cond_init_with_src(K, C, F, L) \
++  inline_mysql_cond_init(PSI_NOT_INSTRUMENTED, C, F, L)
++#endif
+ 
+ /**
+   @def mysql_cond_destroy(C)
+--- a/include/mysql/psi/mysql_mutex.h
++++ b/include/mysql/psi/mysql_mutex.h
+@@ -145,8 +145,13 @@
+ #define mysql_mutex_init(K, M, A) \
+   mysql_mutex_init_with_src(K, M, A, __FILE__, __LINE__)
+ 
++#ifdef HAVE_PSI_MUTEX_INTERFACE
+ #define mysql_mutex_init_with_src(K, M, A, F, L) \
+   inline_mysql_mutex_init(K, M, A, F, L)
++#else
++#define mysql_mutex_init_with_src(K, M, A, F, L) \
++  inline_mysql_mutex_init(PSI_NOT_INSTRUMENTED, M, A, F, L)
++#endif
+ 
+ /**
+   @def mysql_mutex_destroy(M)
+--- a/include/mysql/psi/mysql_rwlock.h
++++ b/include/mysql/psi/mysql_rwlock.h
+@@ -98,8 +98,13 @@
+ #define mysql_rwlock_init(K, T) \
+   mysql_rwlock_init_with_src(K, T, __FILE__, __LINE__)
+ 
++#ifdef HAVE_PSI_RWLOCK_INTERFACE
+ #define mysql_rwlock_init_with_src(K, T, F, L) \
+   inline_mysql_rwlock_init(K, T, F, L)
++#else
++#define mysql_rwlock_init_with_src(K, T, F, L) \
++  inline_mysql_rwlock_init(PSI_NOT_INSTRUMENTED, T, F, L)
++#endif
+ 
+ /**
+   @def mysql_prlock_init(K, T)
+@@ -112,8 +117,13 @@
+ #define mysql_prlock_init(K, T) \
+   mysql_prlock_init_with_src(K, T, __FILE__, __LINE__)
+ 
++#ifdef HAVE_PSI_RWLOCK_INTERFACE
+ #define mysql_prlock_init_with_src(K, T, F, L) \
+   inline_mysql_prlock_init(K, T, F, L)
++#else
++#define mysql_prlock_init_with_src(K, T, F, L) \
++  inline_mysql_prlock_init(PSI_NOT_INSTRUMENTED, T, F, L)
++#endif
+ 
+ /**
+   @def mysql_rwlock_destroy(T)
+--- a/include/mysql/psi/mysql_thread.h
++++ b/include/mysql/psi/mysql_thread.h
+@@ -87,8 +87,13 @@
+   @param P3 my_thread_create parameter 3
+   @param P4 my_thread_create parameter 4
+ */
++#ifdef HAVE_PSI_THREAD_INTERFACE
+ #define mysql_thread_create(K, P1, P2, P3, P4) \
+   inline_mysql_thread_create(K, 0, P1, P2, P3, P4)
++#else
++#define mysql_thread_create(K, P1, P2, P3, P4) \
++  inline_mysql_thread_create(PSI_NOT_INSTRUMENTED, 0, P1, P2, P3, P4)
++#endif
+ 
+ /**
+   @def mysql_thread_create_seq(K, S, P1, P2, P3, P4)
+@@ -104,8 +109,13 @@
+   @param P3 my_thread_create parameter 3
+   @param P4 my_thread_create parameter 4
+ */
++#ifdef HAVE_PSI_THREAD_INTERFACE
+ #define mysql_thread_create_seq(K, S, P1, P2, P3, P4) \
+   inline_mysql_thread_create(K, S, P1, P2, P3, P4)
++#else
++#define mysql_thread_create_seq(K, S, P1, P2, P3, P4) \
++  inline_mysql_thread_create(PSI_NOT_INSTRUMENTED, 0, P1, P2, P3, P4)
++#endif
+ 
+ /**
+   @def mysql_thread_set_psi_id(I)
+--- a/scripts/sys_schema/CMakeLists.txt
++++ b/scripts/sys_schema/CMakeLists.txt
+@@ -190,6 +190,11 @@
+   )
+ 
+ 
++IF(EMSCRIPTEN AND NOT WITH_PERFSCHEMA_STORAGE_ENGINE)
++  # The sys views depend on Performance Schema tables.
++  SET(SYS_SCHEMA_SOURCES)
++ENDIF()
++
+ ADD_CUSTOM_COMMAND(
+   OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/ALL_SYS_SCHEMA.sql
+   COMMAND ${CMAKE_COMMAND}
+--- a/sql/binlog.cc
++++ b/sql/binlog.cc
+@@ -187,6 +187,11 @@
+ /* Size for IO_CACHE buffer for binlog & relay log */
+ ulong rpl_read_size;
+ 
++#ifndef HAVE_PSI_INTERFACE
++static constexpr PSI_file_key key_file_binlog = PSI_NOT_INSTRUMENTED;
++static constexpr PSI_mutex_key key_LOG_LOCK_log = PSI_NOT_INSTRUMENTED;
++#endif
++
+ MYSQL_BIN_LOG mysql_bin_log(&sync_binlog_period);
+ 
+ static int binlog_init(void *p);
+@@ -397,18 +402,13 @@
+      @retval true  Error
+   */
+   bool open(
+-#ifdef HAVE_PSI_INTERFACE
+       PSI_file_key log_file_key,
+-#endif
+       const char *binlog_name, myf flags, bool existing = false) {
+     DBUG_TRACE;
+     assert(m_pipeline_head == nullptr);
+ 
+ #ifndef NDEBUG
+     {
+-#ifndef HAVE_PSI_INTERFACE
+-      PSI_file_key log_file_key = PSI_NOT_INSTRUMENTED;
+-#endif
+       MY_STAT info;
+       if (!mysql_file_stat(log_file_key, binlog_name, &info, MYF(0))) {
+         assert(existing == !(my_errno() == ENOENT));
+@@ -418,7 +418,12 @@
+ #endif
+ 
+     std::unique_ptr<IO_CACHE_ostream> file_ostream(new IO_CACHE_ostream);
+-    if (file_ostream->open(log_file_key, binlog_name, flags)) return true;
++    if (file_ostream->open(
++#ifdef HAVE_PSI_INTERFACE
++            log_file_key,
++#endif
++            binlog_name, flags))
++      return true;
+ 
+     m_pipeline_head = std::move(file_ostream);
+ 
+@@ -446,9 +451,7 @@
+     @retval nullptr Error.
+   */
+   static std::unique_ptr<Binlog_ofile> open_existing(
+-#ifdef HAVE_PSI_INTERFACE
+       PSI_file_key log_file_key,
+-#endif
+       const char *binlog_name, myf flags) {
+     DBUG_TRACE;
+     std::unique_ptr<Rpl_encryption_header> header;
+@@ -456,8 +459,11 @@
+ 
+     /* Open a simple istream to read the magic from the file */
+     IO_CACHE_istream istream;
+-    if (istream.open(key_file_binlog, key_file_binlog_cache, binlog_name,
+-                     MYF(MY_WME | MY_DONT_CHECK_FILESIZE), rpl_read_size))
++    if (istream.open(
++#ifdef HAVE_PSI_INTERFACE
++            key_file_binlog, key_file_binlog_cache,
++#endif
++            binlog_name, MYF(MY_WME | MY_DONT_CHECK_FILESIZE), rpl_read_size))
+       return nullptr;
+     if (istream.read(magic, BINLOG_MAGIC_SIZE) != BINLOG_MAGIC_SIZE)
+       return nullptr;
+@@ -475,9 +481,7 @@
+     /* Open the binlog_ofile */
+     std::unique_ptr<Binlog_ofile> ret_ofile(new Binlog_ofile);
+     if (ret_ofile->open(
+-#ifdef HAVE_PSI_INTERFACE
+             log_file_key,
+-#endif
+             binlog_name, flags, true)) {
+       return nullptr;
+     }
+--- a/sql/binlog_istream.cc
++++ b/sql/binlog_istream.cc
+@@ -220,8 +220,11 @@
+ std::unique_ptr<Basic_seekable_istream> Binlog_ifile::open_file(
+     const char *file_name) {
+   IO_CACHE_istream *ifile = new IO_CACHE_istream;
+-  if (ifile->open(key_file_binlog, key_file_binlog_cache, file_name,
+-                  MYF(MY_WME | MY_DONT_CHECK_FILESIZE), rpl_read_size)) {
++  if (ifile->open(
++#ifdef HAVE_PSI_INTERFACE
++          key_file_binlog, key_file_binlog_cache,
++#endif
++          file_name, MYF(MY_WME | MY_DONT_CHECK_FILESIZE), rpl_read_size)) {
+     delete ifile;
+     return nullptr;
+   }
+@@ -231,8 +234,11 @@
+ std::unique_ptr<Basic_seekable_istream> Relaylog_ifile::open_file(
+     const char *file_name) {
+   IO_CACHE_istream *ifile = new IO_CACHE_istream;
+-  if (ifile->open(key_file_relaylog, key_file_relaylog_cache, file_name,
+-                  MYF(MY_WME | MY_DONT_CHECK_FILESIZE), rpl_read_size)) {
++  if (ifile->open(
++#ifdef HAVE_PSI_INTERFACE
++          key_file_relaylog, key_file_relaylog_cache,
++#endif
++          file_name, MYF(MY_WME | MY_DONT_CHECK_FILESIZE), rpl_read_size)) {
+     delete ifile;
+     return nullptr;
+   }
+--- a/sql/derror.cc
++++ b/sql/derror.cc
+@@ -48,6 +48,21 @@
+ #include "sql/sql_locale.h"
+ #include "sql/system_variables.h"
+ #include "storage/perfschema/pfs_error.h"
++
++#ifndef WITH_PERFSCHEMA_STORAGE_ENGINE
++/**
++  Names of all errors defined in err_msg.txt.
++  This includes all names, instrumented or not.
++*/
++server_error error_names_array[] = {
++#ifndef IN_DOXYGEN
++    {nullptr, 0, nullptr, nullptr, nullptr, 0},  // NULL ROW
++#include <mysqld_ername.h>
++
++    {nullptr, 0, nullptr, nullptr, nullptr, 0}  // DUMMY ROW
++#endif                                          /* IN_DOXYGEN */
++};
++#endif
+ 
+ CHARSET_INFO *error_message_charset_info;
+ 
+--- a/sql/iterators/hash_join_chunk.cc
++++ b/sql/iterators/hash_join_chunk.cc
+@@ -70,7 +70,9 @@
+ 
+ bool HashJoinChunk::Init(const TableCollection &tables, bool uses_match_flags) {
+   m_tables = tables;
++#ifdef HAVE_PSI_FILE_INTERFACE
+   m_file.file_key = key_file_hash_join;
++#endif
+   m_num_rows = 0;
+   m_uses_match_flags = uses_match_flags;
+   close_cached_file(&m_file);
+--- a/sql/mdl_context_backup.cc
++++ b/sql/mdl_context_backup.cc
+@@ -92,13 +92,14 @@
+ 
+ MDL_context_backup_manager *MDL_context_backup_manager::m_single = nullptr;
+ 
++static PSI_memory_key key_memory_MDL_context_backup_manager;
++
+ #ifdef HAVE_PSI_INTERFACE
+ static PSI_mutex_key key_LOCK_mdl_context_backup_manager;
+ static PSI_mutex_info mdl_context_backup_manager_mutexes[] = {
+     {&key_LOCK_mdl_context_backup_manager, "LOCK_mdl_context_backup_manager",
+      PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME}};
+ 
+-static PSI_memory_key key_memory_MDL_context_backup_manager;
+ static PSI_memory_info mdl_context_backup_manager_memory[] = {
+     {&key_memory_MDL_context_backup_manager, "MDL_context::backup_manager", 0,
+      0, "MDL for prepared XA trans with disconnected client."}};
+--- a/sql/mysqld.cc
++++ b/sql/mysqld.cc
+@@ -894,10 +894,12 @@
+ #include "sql_common.h"                // mysql_client_plugin_init
+ #include "sql_string.h"
+ #include "storage/myisam/ha_myisam.h"                 // HA_RECOVER_OFF
++#ifdef WITH_PERFSCHEMA_STORAGE_ENGINE
+ #include "storage/perfschema/pfs_buffer_container.h"  // PFS metric counters
+ #include "storage/perfschema/pfs_instr_class.h"       // PFS metric counters
+ #include "storage/perfschema/pfs_services.h"
+ #include "storage/perfschema/telemetry_pfs_metrics.h"  // register_pfs_metric_sources
++#endif
+ #include "string_with_len.h"
+ #include "strings/str_alloc.h"
+ #include "strmake.h"
+@@ -2713,7 +2715,9 @@
+ 
+   if (set_server_shutting_down()) return;
+ 
++#ifdef WITH_PERFSCHEMA_STORAGE_ENGINE
+   unregister_pfs_metric_sources();
++#endif
+   unregister_server_metric_sources();
+   unregister_server_telemetry_loggers();
+ 
+@@ -9924,7 +9928,9 @@
+     to avoid observing states that are not fully initialized.
+   */
+   register_server_metric_sources();
++#ifdef WITH_PERFSCHEMA_STORAGE_ENGINE
+   register_pfs_metric_sources();
++#endif
+ 
+   register_server_telemetry_loggers();
+ 
+@@ -9975,7 +9981,9 @@
+     This is done before performing the cleanup to shutdown,
+     to avoid observing states that are being destroyed.
+   */
++#ifdef WITH_PERFSCHEMA_STORAGE_ENGINE
+   unregister_pfs_metric_sources();
++#endif
+   unregister_server_metric_sources();
+ 
+   unregister_server_telemetry_loggers();
+--- a/sql/resourcegroups/resource_group_mgr.cc
++++ b/sql/resourcegroups/resource_group_mgr.cc
+@@ -314,8 +314,8 @@
+   DBUG_TRACE;
+ 
+ #ifndef WITH_PERFSCHEMA_STORAGE_ENGINE
+-  // WITH_PERFSCHEMA_STORAGE_ENGINE is always set.
+-  static_assert(0, "WITH_PERFSCHEMA_STORAGE_ENGINE not defined.");
++  m_unsupport_reason = "Server compiled without Performance Schema";
++  return false;
+ #endif
+ 
+   if (!platform::is_platform_supported()) {
+--- a/sql/rpl_msr.h
++++ b/sql/rpl_msr.h
+@@ -379,8 +379,8 @@
+     return empty_mi_map.end();
+   }
+ 
++#ifdef WITH_PERFSCHEMA_STORAGE_ENGINE
+  private:
+-#ifdef WITH_PERFSCHEMA_STORAGE_ENGINE
+ 
+   /* Initialize the rpl_pfs_mi array to NULLs */
+   inline void init_rpl_pfs_mi() {
+--- a/sql/rpl_replica.cc
++++ b/sql/rpl_replica.cc
+@@ -182,6 +182,13 @@
+ using std::max;
+ using std::min;
+ 
++#ifndef HAVE_PSI_INTERFACE
++static constexpr PSI_thread_key key_thread_replica_io = PSI_NOT_INSTRUMENTED;
++static constexpr PSI_thread_key key_thread_replica_sql = PSI_NOT_INSTRUMENTED;
++static constexpr PSI_thread_key key_thread_replica_monitor_io =
++    PSI_NOT_INSTRUMENTED;
++#endif
++
+ #define FLAGSTR(V, F) ((V) & (F) ? #F " " : "")
+ 
+ /*
+--- a/sql/server_component/server_component.cc
++++ b/sql/server_component/server_component.cc
+@@ -104,9 +104,11 @@
+ #include "sql/server_component/mysql_admin_session_imp.h"
+ #include "sql/server_component/mysql_query_attributes_imp.h"
+ #include "sql/udf_registration_imp.h"
++#ifdef WITH_PERFSCHEMA_STORAGE_ENGINE
+ #include "storage/perfschema/pfs.h"
+ #include "storage/perfschema/pfs_plugin_table.h"
+ #include "storage/perfschema/pfs_services.h"
++#endif
+ #include "system_variable_source_imp.h"
+ #include "thread_cleanup_register_imp.h"
+ #include "udf_metadata_imp.h"
+@@ -926,6 +928,7 @@
+     PROVIDES_SERVICE(mysql_server, mysql_server_runnable),
+     PROVIDES_SERVICE(mysql_server, mysql_audit_api_connection),
+     PROVIDES_SERVICE(mysql_server, mysql_audit_api_connection_with_error),
++#ifdef WITH_PERFSCHEMA_STORAGE_ENGINE
+     PROVIDES_SERVICE(mysql_server, mysql_psi_system_v1),
+     PROVIDES_SERVICE(performance_schema, psi_cond_v1),
+     PROVIDES_SERVICE(performance_schema, psi_error_v1),
+@@ -987,6 +990,7 @@
+ 
+     PROVIDES_SERVICE(mysql_server, pfs_notification_v3),
+     PROVIDES_SERVICE(mysql_server, pfs_resource_group_v3),
++#endif
+ 
+     PROVIDES_SERVICE(mysql_server, mysql_query_attributes_iterator),
+     PROVIDES_SERVICE(mysql_server, mysql_query_attribute_string),
+--- a/sql/srv_session.cc
++++ b/sql/srv_session.cc
+@@ -114,13 +114,12 @@
+       true   failure
+   */
+   bool init() {
++    initted = true;
++#ifdef HAVE_PSI_INTERFACE
+     const char *category = "session";
+     PSI_mutex_info all_mutexes[] = {{&key_LOCK_collection,
+                                      "LOCK_srv_session_threads",
+                                      PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME}};
+-
+-    initted = true;
+-#ifdef HAVE_PSI_INTERFACE
+     psi_initted = true;
+ 
+     mysql_mutex_register(category, all_mutexes,
+@@ -313,13 +312,12 @@
+       true   failure
+   */
+   bool init() {
++    initted = true;
++#ifdef HAVE_PSI_INTERFACE
+     const char *category = "session";
+     PSI_rwlock_info all_rwlocks[] = {{&key_LOCK_collection,
+                                       "LOCK_srv_session_collection",
+                                       PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME}};
+-
+-    initted = true;
+-#ifdef HAVE_PSI_INTERFACE
+     psi_initted = true;
+ 
+     mysql_rwlock_register(category, all_rwlocks,
+--- a/sql/sys_vars.cc
++++ b/sql/sys_vars.cc
+@@ -520,6 +520,8 @@
+ 
+ #endif /* WITH_LOCK_ORDER */
+ 
++static constexpr int num_prepared_stmt_limit = 4 * 1024 * 1024;
++
+ #ifdef WITH_PERFSCHEMA_STORAGE_ENGINE
+ 
+ #define PFS_TRAILING_PROPERTIES                                         \
+@@ -728,8 +730,6 @@
+     READ_ONLY GLOBAL_VAR(pfs_param.m_program_sizing), CMD_LINE(REQUIRED_ARG),
+     VALID_RANGE(-1, 1024 * 1024), DEFAULT(PFS_AUTOSCALE_VALUE), BLOCK_SIZE(1),
+     PFS_TRAILING_PROPERTIES);
+-
+-static constexpr int num_prepared_stmt_limit = 4 * 1024 * 1024;
+ 
+ static Sys_var_long Sys_pfs_max_prepared_stmt_instances(
+     "performance_schema_max_prepared_statements_instances",
+--- a/sql/tztime.cc
++++ b/sql/tztime.cc
+@@ -1130,22 +1130,22 @@
+ 
+ static PSI_memory_key key_memory_tz_storage;
+ 
+-#ifdef HAVE_PSI_INTERFACE
+-static PSI_mutex_key key_tz_LOCK;
+-
+-static PSI_mutex_info all_tz_mutexes[] = {
+-    {&key_tz_LOCK, "tz_LOCK", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME}};
+-
+-static PSI_memory_info all_tz_memory[] = {{&key_memory_tz_storage, "tz_storage",
+-                                           PSI_FLAG_ONLY_GLOBAL_STAT, 0,
+-                                           "Shared time zone data."}};
+-
+ class Tz_names_entry;
+ 
+ static collation_unordered_map<std::string, Tz_names_entry *> tz_names{
+     &my_charset_latin1, key_memory_tz_storage};
+ static malloc_unordered_map<long, Time_zone_offset *> offset_tzs{
+     key_memory_tz_storage};
++
++#ifdef HAVE_PSI_INTERFACE
++static PSI_mutex_key key_tz_LOCK;
++
++static PSI_mutex_info all_tz_mutexes[] = {
++    {&key_tz_LOCK, "tz_LOCK", PSI_FLAG_SINGLETON, 0, PSI_DOCUMENT_ME}};
++
++static PSI_memory_info all_tz_memory[] = {{&key_memory_tz_storage, "tz_storage",
++                                           PSI_FLAG_ONLY_GLOBAL_STAT, 0,
++                                           "Shared time zone data."}};
+ 
+ static void init_tz_psi_keys(void) {
+   const char *category = "sql";
+--- a/storage/innobase/btr/btr0mtib.cc
++++ b/storage/innobase/btr/btr0mtib.cc
+@@ -68,8 +68,12 @@
+   m_max_queue_size = queue_size;
+ 
+   std::thread flush_thread([this]() {
++#ifdef UNIV_PFS_THREAD
+     auto pfs_index = static_cast<PSI_thread_seqnum>(m_id);
+     Runnable runnable{bulk_flusher_thread_key, pfs_index};
++#else
++    Runnable runnable{PFS_NOT_INSTRUMENTED, 0};
++#endif
+     runnable([this]() { return run(); });
+   });
+   m_flush_thread = std::move(flush_thread);
+@@ -2116,7 +2120,11 @@
+ 
+ void Bulk_extent_allocator::start() {
+   std::thread alloc_thread([this]() {
++#ifdef UNIV_PFS_THREAD
+     Runnable runnable{bulk_alloc_thread_key, 0};
++#else
++    Runnable runnable{PFS_NOT_INSTRUMENTED, 0};
++#endif
+     runnable([this]() { return run(); });
+   });
+   m_thread = std::move(alloc_thread);
+--- a/storage/innobase/clone/clone0api.cc
++++ b/storage/innobase/clone/clone0api.cc
+@@ -35,6 +35,7 @@
+ 
+ #include "clone0api.h"
+ #include "clone0clone.h"
++#include "mysql/psi/mysql_file.h"
+ #include "os0thread-create.h"
+ 
+ #include "sql/clone_handler.h"
+--- a/storage/innobase/handler/ha_innodb.cc
++++ b/storage/innobase/handler/ha_innodb.cc
+@@ -152,7 +152,9 @@
+ #include "my_psi_config.h"
+ #include "mysql/components/services/log_builtins.h"
+ #include "mysql/plugin.h"
++#ifdef HAVE_PSI_DATA_LOCK_INTERFACE
+ #include "mysql/psi/mysql_data_lock.h"
++#endif
+ #include "mysql/psi/mysql_metric.h"
+ #include "mysql/strings/int2str.h"
+ #include "mysql/strings/m_ctype.h"
+@@ -160,7 +162,9 @@
+ #include "nulls.h"
+ #include "os0thread-create.h"
+ #include "os0thread.h"
++#ifdef HAVE_PSI_DATA_LOCK_INTERFACE
+ #include "p_s.h"
++#endif
+ #include "page0zip.h"
+ #include "pars0pars.h"
+ #include "rem0types.h"
+@@ -248,11 +252,13 @@
+     return false;
+   }
+ 
++#ifdef WITH_PERFSCHEMA_STORAGE_ENGINE
+   /* During initialize, PFS is not ready. */
+   if (!opt_initialize &&
+       !log_pfs_acquire_services(innobase::component_services::reg_srv)) {
+     ib::warn(ER_IB_MSG_LOG_PFS_ACQUIRE_SERVICES_FAILED);
+   }
++#endif
+ 
+   return true;
+ }
+@@ -260,9 +266,11 @@
+ /** Deinitialize component service handles */
+ static void deinitialize_service_handles() {
+   DBUG_TRACE;
++#ifdef WITH_PERFSCHEMA_STORAGE_ENGINE
+   if (!opt_initialize) {
+     log_pfs_release_services(reg_srv);
+   }
++#endif
+   innobase::encryption::deinit_keyring_services(reg_srv);
+   if (reg_srv != nullptr) {
+     mysql_plugin_registry_release(reg_srv);
+@@ -350,7 +358,9 @@
+ 
+ static char *innodb_version_str = (char *)INNODB_VERSION_STR;
+ 
++#ifdef HAVE_PSI_DATA_LOCK_INTERFACE
+ static Innodb_data_lock_inspector innodb_data_lock_inspector;
++#endif
+ 
+ /** Note we cannot use rec_format_enum because we do not allow
+ COMPRESSED row format for innodb_default_row_format option. */
+@@ -1595,7 +1605,9 @@
+   DBUG_TRACE;
+ 
+   if (innodb_inited) {
++#ifdef WITH_PERFSCHEMA_STORAGE_ENGINE
+     log_pfs_delete_tables();
++#endif
+ 
+     innodb_inited = false;
+     ut::delete_(innobase_open_tables);
+@@ -4200,11 +4212,13 @@
+ 
+   ut_a(innodb_inited);
+ 
++#ifdef WITH_PERFSCHEMA_STORAGE_ENGINE
+   if (!opt_initialize) {
+     if (!log_pfs_create_tables()) {
+       ib::warn(ER_IB_MSG_LOG_PFS_CREATE_TABLES_FAILED);
+     }
+   }
++#endif
+ }
+ 
+ /**
+@@ -5627,7 +5641,9 @@
+   global_count += count;
+ #endif /* UNIV_DEBUG */
+ 
++#ifdef HAVE_PSI_DATA_LOCK_INTERFACE
+   mysql_data_lock_register(&innodb_data_lock_inspector);
++#endif
+ 
+ #ifdef UNIV_DEBUG
+   if (mysql_pfs_key_t::get_count() != global_count) {
+--- a/storage/innobase/handler/p_s.cc
++++ b/storage/innobase/handler/p_s.cc
+@@ -30,6 +30,9 @@
+ 
+  *******************************************************/
+ 
++#include "my_psi_config.h"
++
++#ifdef HAVE_PSI_DATA_LOCK_INTERFACE
+ #include "storage/innobase/handler/p_s.h"
+ 
+ #include <type_traits>
+@@ -679,3 +682,5 @@
+ 
+   return found;
+ }
++
++#endif /* HAVE_PSI_DATA_LOCK_INTERFACE */
+--- a/storage/innobase/include/sync0sync.h
++++ b/storage/innobase/include/sync0sync.h
+@@ -68,7 +68,9 @@
+   static unsigned int s_count;
+ };
+ 
+-#endif /* HAVE_PFS_INTERFACE */
++#else
++using mysql_pfs_key_t = unsigned int;
++#endif /* HAVE_PSI_INTERFACE */
+ 
+ #if defined UNIV_PFS_MUTEX || defined UNIV_PFS_RWLOCK
+ 
+@@ -211,13 +213,11 @@
+ extern mysql_pfs_key_t hash_table_locks_key;
+ #endif /* UNIV_PFS_RWLOCK */
+ 
+-#ifdef HAVE_PSI_INTERFACE
+ /* There are mutexes/rwlocks that we want to exclude from instrumentation
+ even if their corresponding performance schema define is set. And this
+ PFS_NOT_INSTRUMENTED is used as the key value to identify those objects that
+ would be excluded from instrumentation.*/
+ extern mysql_pfs_key_t PFS_NOT_INSTRUMENTED;
+-#endif /* HAVE_PFS_INTERFACE */
+ 
+ /** Prints info of the sync system.
+ @param[in]      file    where to print */
+--- a/storage/innobase/os/os0file.cc
++++ b/storage/innobase/os/os0file.cc
+@@ -6185,11 +6185,9 @@
+   }
+ }
+ 
+-#ifdef UNIV_PFS_THREAD
+ mysql_pfs_key_t io_ibuf_thread_key;
+ mysql_pfs_key_t io_read_thread_key;
+ mysql_pfs_key_t io_write_thread_key;
+-#endif /* UNIV_PFS_THREAD */
+ 
+ void AIO::start_threads() {
+   ulint segment = 0;
+--- a/storage/innobase/trx/trx0i_s.cc
++++ b/storage/innobase/trx/trx0i_s.cc
+@@ -66,6 +66,7 @@
+ #include "trx0trx.h"
+ #include "ut0mem.h"
+ 
++#ifdef HAVE_PSI_DATA_LOCK_INTERFACE
+ #include "storage/perfschema/pfs_data_lock.h"
+ static_assert(pk_pos_data_lock::max_len > TRX_I_S_LOCK_ID_MAX_LEN,
+               "pk_pos_data_lock::m_engine_lock_id must be able to hold "
+@@ -76,6 +77,7 @@
+ static_assert(pk_pos_data_lock_wait::max_len > TRX_I_S_LOCK_ID_MAX_LEN,
+               "pk_pos_data_lock_wait::m_blocking_engine_lock_id must be able "
+               "to hold engine_lock_id which has TRX_I_S_LOCK_ID_MAX_LEN chars");
++#endif
+ 
+ /** Initial number of rows in the table cache */
+ constexpr uint32_t TABLE_CACHE_INITIAL_ROWSNUM = 1024;
+@@ -576,6 +578,7 @@
+   return (ret);
+ }
+ 
++#ifdef HAVE_PSI_DATA_LOCK_INTERFACE
+ /** Fill performance schema lock data.
+ Create a string that represents the LOCK_DATA
+ column, for a given lock record.
+@@ -648,6 +651,7 @@
+ 
+   mtr_commit(&mtr);
+ }
++#endif
+ 
+ void fill_locks_row(i_s_locks_row_t *row, const lock_t *lock, ulint heap_no) {
+   row->lock_guid = lock_guid_t(*lock);
+--- a/storage/perfschema/CMakeLists.txt
++++ b/storage/perfschema/CMakeLists.txt
+@@ -382,10 +382,12 @@
+ table_binary_log_transaction_compression_stats.cc
+ telemetry_pfs_metrics.cc
+ )
+-MYSQL_ADD_PLUGIN(perfschema ${PERFSCHEMA_SOURCES}
+-  STORAGE_ENGINE MANDATORY STATIC_ONLY
+-  LINK_LIBRARIES extra::rapidjson ext::zlib mysql_gtid extra::unordered_dense
+-  )
++IF(NOT EMSCRIPTEN OR WITH_PERFSCHEMA_STORAGE_ENGINE)
++  MYSQL_ADD_PLUGIN(perfschema ${PERFSCHEMA_SOURCES}
++    STORAGE_ENGINE MANDATORY STATIC_ONLY
++    LINK_LIBRARIES extra::rapidjson ext::zlib mysql_gtid extra::unordered_dense
++    )
++ENDIF()
+ IF(WITH_UNIT_TESTS)
+   ADD_SUBDIRECTORY(unittest)
+ ENDIF()
+--- a/storage/perfschema/pfs_error.h
++++ b/storage/perfschema/pfs_error.h
+@@ -59,7 +59,9 @@
+ void aggregate_user_errors(PFS_user *user);
+ void aggregate_host_errors(PFS_host *host);
+ 
++#ifdef HAVE_PSI_INTERFACE
+ int init_error(const PFS_global_param *param);
++#endif
+ void cleanup_error();
+ uint lookup_error_stat_index(uint mysql_errno);
+ #endif
+--- a/sql/item_pfs_func.cc
++++ b/sql/item_pfs_func.cc
+@@ -47,7 +47,11 @@
+ #include "sql/sql_class.h"
+ #include "sql/sql_lex.h"
+ 
++#ifdef WITH_PERFSCHEMA_STORAGE_ENGINE
+ extern bool pfs_enabled;
++#else
++static constexpr bool pfs_enabled = false;
++#endif
+ 
+ /** ps_current_thread_id() */
+ 
+--- a/sql/rpl_msr.cc
++++ b/sql/rpl_msr.cc
+@@ -237,6 +237,8 @@
+ 
+   return nullptr;
+ }
++
++#endif /* WITH_PERFSCHEMA_STORAGE_ENGINE */
+ 
+ Rpl_filter *Rpl_channel_filters::create_filter(const char *channel_name) {
+   DBUG_TRACE;
+@@ -412,8 +414,6 @@
+   return false;
+ }
+ 
+-#endif /*WITH_PERFSCHEMA_STORAGE_ENGINE */
+-
+ /* There is only one channel_map for the whole server */
+ Multisource_info channel_map;
+ /* There is only one rpl_channel_filters for the whole server */
+--- a/sql/rpl_gtid_misc.cc
++++ b/sql/rpl_gtid_misc.cc
+@@ -48,7 +48,11 @@
+ #include "sql/rpl_msr.h"
+ #include "sql/sql_class.h"  // THD
+ #include "sql/sql_error.h"
++#ifdef WITH_PERFSCHEMA_STORAGE_ENGINE
+ #include "storage/perfschema/pfs_instr_class.h"  // gtid_monitoring_getsystime
++#else
++static constexpr ulonglong gtid_monitoring_getsystime() { return 0; }
++#endif
+ #endif                                           // ifdef MYSQL_SERVER
+ 
+ #ifndef MYSQL_SERVER
+--- a/sql/CMakeLists.txt
++++ b/sql/CMakeLists.txt
+@@ -915,6 +915,10 @@
+ ENDIF()
+ 
+ ADD_STATIC_LIBRARY(sql_main ${SQL_SOURCE} LINK_LIBRARIES ext::icu ext::xxhash)
++IF(EMSCRIPTEN AND NOT WITH_PERFSCHEMA_STORAGE_ENGINE)
++  TARGET_SOURCES(sql_main PRIVATE
++    ${CMAKE_SOURCE_DIR}/storage/perfschema/terminology_use_previous.cc)
++ENDIF()
+ ADD_DEPENDENCIES(sql_main GenServerSource)
+ ADD_DEPENDENCIES(sql_main GenDigestServerSource)
+ ADD_DEPENDENCIES(sql_main GenBootstrapPriv)

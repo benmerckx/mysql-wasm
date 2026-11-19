@@ -62,6 +62,12 @@ The ICU bundle includes the data used by regular expressions, including
 named characters (`\N{name}`), grapheme clusters (`\X`), and dictionary
 segmentation for Unicode word boundaries (`(?w)\b`). It omits ICU line,
 sentence, and title break rules and locale overrides unused by the regex engine.
+
+Performance Schema and its instrumentation are omitted. New data directories
+skip the bundled `sys` schema, whose diagnostic views depend on Performance
+Schema. `SHOW VARIABLES` and `SHOW STATUS` also use Performance Schema in
+MySQL 8.4 and return an error in this build.
+
 The `ST_*` spatial functions and `MBR*` predicates are omitted. Geometry
 columns, spatial indexes, and constructors such as `POINT(x, y)` are
 available. New databases include spatial reference IDs 0, 3857, and 4326.
