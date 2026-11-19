@@ -8,7 +8,9 @@ import { serverOptions } from '../src/options.mjs';
 const [dist] = process.argv.slice(2);
 const block = 4096;
 // Each server generates its own UUID, TLS material and temporary tablespaces.
-const skip = /^(auto\.cnf|ibtmp1|#innodb_temp|.*\.pem)$/;
+// After a clean shutdown InnoDB also recreates the doublewrite files and the
+// spare redo files, which hold only stale log data and are most of the size.
+const skip = /^(auto\.cnf|ibtmp1|#innodb_temp|.*\.pem|.*\.dblwr|#ib_redo\d+_tmp)$/;
 
 const scratch = await mkdtemp(join(tmpdir(), 'mysql-wasm-datadir-'));
 try {
