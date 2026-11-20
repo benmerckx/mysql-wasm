@@ -46,4 +46,5 @@ exec emcmake cmake -S "$source_dir" -B "$build_dir" -G Ninja \
   -DWITHOUT_GROUP_REPLICATION=ON \
   -DWITH_ROUTER=OFF \
   -DWITH_UNIT_TESTS=OFF \
+  -DWITH_CURL=none \
   "$@"

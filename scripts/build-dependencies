@@ -20,7 +20,7 @@ prefix="$root/build/openssl-wasm32"
 cmake -S "$upstream" -B "$native" -G Ninja \
   -DCMAKE_BUILD_TYPE=Release \
   -DWITHOUT_SERVER=ON -DWITH_ROUTER=OFF -DWITH_UNIT_TESTS=OFF \
-  -DWITH_TIRPC=bundled
+  -DWITH_TIRPC=bundled -DWITH_CURL=none
 cmake --build "$native" --target comp_err uca9dump comp_sql --parallel "$jobs"
 
 if [[ ! -d "$openssl/.git" ]]; then
