@@ -14,8 +14,10 @@ const { rows } = await db.sql`SELECT * FROM users WHERE id = ${insertId}`;
 ```
 
 - `query(sql, params?, { rowMode }?)` runs one statement and returns
-  `{ rows, fields, affectedRows, insertId }`. Parameters use MySQL's
-  prepared-statement protocol. Strings, numbers, booleans, bigints, dates,
+  `{ rows, fields, affectedRows, changedRows, insertId }`. As in mysql2,
+  `affectedRows` counts the rows an `UPDATE` matched and `changedRows` the
+  ones it changed. Parameters use MySQL's prepared-statement protocol.
+  Strings, numbers, booleans, bigints, dates,
   binary values and `null` are supported. Use one placeholder per value in an
   `IN` list. `rowMode: 'array'` returns rows as arrays, which keeps columns
   that share a name.
@@ -39,9 +41,10 @@ safe integer range, and `insertId` beyond it, are bigints, as in PGlite.
 `DECIMAL` and date and time values are strings, JSON columns are parsed,
 and binary strings are `Uint8Array`s. `types` names the `Field.type` codes.
 
-Node.js 24 or later can use a filesystem path or `file://` URL for
-`dataDir`. Browsers accept `idb://name` and save writes to IndexedDB shortly
-after each query. Omit `dataDir` or use `memory://` for temporary storage.
+The server needs WebAssembly Memory64: Node.js 24 or later, or a recent
+Chrome or Firefox. Bun does not support it yet. Node can use a filesystem
+path or `file://` URL for `dataDir`. Browsers accept `idb://name` and save
+writes to IndexedDB shortly after each query. Omit `dataDir` or use `memory://` for temporary storage.
 Only one connection may open a given persistent data directory at a time; a
 lock left by a crashed Node process is taken over. Snapshots and the prebuilt
 data directory use `lower_case_table_names=0`, so on a case-insensitive disk,
@@ -101,8 +104,7 @@ case-sensitive temporary directory.
 The `ST_*` spatial functions and `MBR*` predicates are omitted. Geometry
 columns, spatial indexes, and constructors such as `POINT(x, y)` are
 available. New databases include spatial reference IDs 0, 3857, and 4326.
-Snapshot import and export and network client connections are outside the
-current JavaScript API.
+Network client connections are outside the current JavaScript API.
 
 ## Upstream source
 

@@ -24,7 +24,10 @@ export interface Field {
 export interface QueryResult<Row = Record<string, unknown>> {
   rows: Row[];
   fields: Field[];
+  /** Rows inserted, deleted, or matched by an UPDATE. */
   affectedRows: number;
+  /** Rows an UPDATE changed; otherwise the same as affectedRows. */
+  changedRows: number;
   /** The AUTO_INCREMENT value of the last inserted row, or 0. */
   insertId: number | bigint;
 }

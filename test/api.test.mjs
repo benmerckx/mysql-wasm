@@ -199,3 +199,23 @@ test('a lock left by a crashed process is taken over', async () => {
     await rm(dataDir, { recursive: true, force: true });
   }
 });
+
+test('objects with the default definer can be used', async () => {
+  await using db = await MySQL.create();
+  await db.exec(`CREATE TABLE t (id INT);
+    CREATE VIEW v AS SELECT * FROM t;
+    CREATE FUNCTION bump(x INT) RETURNS INT DETERMINISTIC RETURN x + 1;
+    CREATE TRIGGER copy BEFORE INSERT ON t FOR EACH ROW SET NEW.id = bump(NEW.id);
+    INSERT INTO t VALUES (1)`);
+  assert.deepEqual((await db.query('SELECT id FROM v')).rows, [{ id: 2 }]);
+  assert.deepEqual((await db.query('SELECT CURRENT_USER() AS user')).rows, [{ user: 'root@localhost' }]);
+});
+
+test('updates report matched and changed rows', async () => {
+  await using db = await MySQL.create();
+  await db.exec('CREATE TABLE t (id INT PRIMARY KEY, n INT); INSERT INTO t VALUES (1, 1), (2, 2)');
+  const update = await db.query('UPDATE t SET n = 1');
+  assert.equal(update.affectedRows, 2);
+  assert.equal(update.changedRows, 1);
+  assert.equal((await db.query('DELETE FROM t')).changedRows, 2);
+});

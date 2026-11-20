@@ -88,13 +88,14 @@ function integer(text) {
 }
 
 export function decodeResults(results, rowMode = 'object') {
-  return results.map(({ rows, fields, affectedRows, insertId }) => {
+  return results.map(({ rows, fields, affectedRows, changedRows, insertId }) => {
     const cells = rows.map(row => fields.map((field, i) => decodeCell(row[i], field)));
     return {
       rows: rowMode === 'array' ? cells
         : cells.map(row => Object.fromEntries(fields.map((field, i) => [field.name, row[i]]))),
       fields,
       affectedRows,
+      changedRows,
       insertId: integer(insertId),
     };
   });

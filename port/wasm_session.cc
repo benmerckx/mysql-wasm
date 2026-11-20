@@ -16,6 +16,7 @@
 #include "my_time.h"
 #include "mysql/com_data.h"
 #include "mysql/service_command.h"
+#include "mysql/service_security_context.h"
 #include "mysql/service_srv_session.h"
 #include "mysql/service_srv_session_info.h"
 #include "mysql_com.h"
@@ -113,6 +114,7 @@ struct Result {
   std::vector<Row> rows;
   ulonglong affected = 0;
   ulonglong insert_id = 0;
+  ulonglong changed = 0;
 };
 struct Command {
   bool multi = false;
@@ -143,7 +145,8 @@ const st_command_service_cbs callbacks{
     },
     .abort_row = [](void *ptr) { context(ptr).row.clear(); },
     .get_client_capabilities = [](void *ptr) -> ulong {
-      return CLIENT_MULTI_RESULTS | CLIENT_PS_MULTI_RESULTS |
+      // Found rows makes UPDATE report matched rows, as mysql2 does.
+      return CLIENT_MULTI_RESULTS | CLIENT_PS_MULTI_RESULTS | CLIENT_FOUND_ROWS |
              (context(ptr).multi ? CLIENT_MULTI_STATEMENTS : 0);
     },
     .get_null = [](void *ptr) { context(ptr).row.emplace_back(); return 0; },
@@ -198,11 +201,14 @@ const st_command_service_cbs callbacks{
       }
       return 0;
     },
-    .handle_ok = [](void *ptr, uint, uint, ulonglong affected, ulonglong insert_id, const char *) {
+    .handle_ok = [](void *ptr, uint, uint, ulonglong affected, ulonglong insert_id, const char *message) {
       auto &cmd = context(ptr);
       if (!cmd.preparing) {
+        // UPDATE reports changed rows only in its info message.
+        const char *changed = message ? std::strstr(message, "Changed: ") : nullptr;
         cmd.result.affected = affected;
         cmd.result.insert_id = insert_id;
+        cmd.result.changed = changed ? std::strtoull(changed + 9, nullptr, 10) : affected;
         cmd.results.push_back(std::move(cmd.result));
         cmd.result = {};
       }
@@ -303,6 +309,7 @@ void respond(const Command &cmd) {
     for (const auto &result : cmd.results) {
       out.StartObject();
       out.Key("affectedRows"); out.Uint64(result.affected);
+      out.Key("changedRows"); out.Uint64(result.changed);
       // A string keeps 64-bit IDs exact through JSON.parse.
       out.Key("insertId"); string(out, std::to_string(result.insert_id));
       out.Key("fields"); out.StartArray();
@@ -361,7 +368,11 @@ void handle(MYSQL_SESSION session, std::string_view line) {
 bool mysql_wasm_run_session() {
   MYSQL_SESSION session = srv_session_open(nullptr, nullptr);
   if (!session) return false;
-  srv_session_info_get_thd(session)->security_context()->skip_grants("root");
+  // A real account makes CURRENT_USER(), and so the default definer of views,
+  // routines and triggers, one that exists in mysql.user.
+  Security_context *sctx = srv_session_info_get_thd(session)->security_context();
+  if (security_context_lookup(sctx, "root", "localhost", "127.0.0.1", nullptr))
+    sctx->skip_grants("root");
 
   rapidjson::StringBuffer ready;
   Writer writer(ready);

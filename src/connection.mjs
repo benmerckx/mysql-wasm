@@ -1,6 +1,6 @@
 import { decodeResults, encodeRequest } from './protocol.mjs';
 
-const empty = { rows: [], fields: [], affectedRows: 0, insertId: 0 };
+const empty = { rows: [], fields: [], affectedRows: 0, changedRows: 0, insertId: 0 };
 
 export class Connection {
   #transport;
