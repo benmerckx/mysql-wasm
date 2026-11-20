@@ -39,7 +39,9 @@ const { rows } = await db.sql`SELECT * FROM users WHERE id = ${insertId}`;
 Results decode integers and floats as numbers. `BIGINT` values outside the
 safe integer range, and `insertId` beyond it, are bigints, as in PGlite.
 `DECIMAL` and date and time values are strings, JSON columns are parsed,
-and binary strings are `Uint8Array`s. `types` names the `Field.type` codes.
+binary strings are `Uint8Array`s, and `VECTOR` values are `Float32Array`s.
+Typed arrays and `ArrayBuffer`s are sent as binary parameters, so a
+`Float32Array` fills a `VECTOR` column. `types` names the `Field.type` codes.
 
 Node.js 24 or later and Bun can use a filesystem path or `file://` URL for
 `dataDir`. Browsers accept `idb://name` and save writes to IndexedDB shortly

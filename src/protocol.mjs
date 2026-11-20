@@ -73,6 +73,9 @@ function decodeCell(value, field) {
       return integer(text());
     case types.json:
       return JSON.parse(text());
+    case types.vector:
+      // MySQL stores vectors as little-endian float32, like every Wasm host.
+      return new Float32Array(bytes.buffer, bytes.byteOffset, bytes.length / 4);
     case types.decimal: case types.newdecimal: case types.timestamp: case types.date:
     case types.time: case types.datetime: case types.newdate:
       return text();

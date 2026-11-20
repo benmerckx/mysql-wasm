@@ -166,6 +166,15 @@ test('results report insert ids, array rows and template queries', async () => {
   assert.deepEqual((await db.query('SELECT 1 AS x, 2 AS x', undefined, { rowMode: 'array' })).rows, [[1, 2]]);
 });
 
+test('vectors round-trip as Float32Arrays', async () => {
+  await using db = await MySQL.create();
+  await db.exec('CREATE TABLE v (id INT PRIMARY KEY, e VECTOR(3))');
+  await db.query('INSERT INTO v VALUES (1, ?)', [new Float32Array([1, 2.5, -3])]);
+  const { rows: [row] } = await db.query("SELECT e, VECTOR_TO_STRING(e) AS s FROM v");
+  assert.deepEqual(row.e, new Float32Array([1, 2.5, -3]));
+  assert.equal(row.s, '[1.00000e+00,2.50000e+00,-3.00000e+00]');
+});
+
 test('dump and load copy a database', async () => {
   const source = await MySQL.create();
   await source.exec("CREATE TABLE notes (id INT PRIMARY KEY, body TEXT); INSERT INTO notes VALUES (1, 'kept')");
