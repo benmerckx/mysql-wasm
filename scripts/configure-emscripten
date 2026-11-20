@@ -47,4 +47,5 @@ exec emcmake cmake -S "$source_dir" -B "$build_dir" -G Ninja \
   -DWITH_ROUTER=OFF \
   -DWITH_UNIT_TESTS=OFF \
   -DWITH_CURL=none \
+  -DWITH_AUTHENTICATION_WEBAUTHN=OFF -DWITH_AUTHENTICATION_CLIENT_PLUGINS=OFF -DWITH_FIDO=none \
   "$@"

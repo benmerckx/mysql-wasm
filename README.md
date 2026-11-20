@@ -83,7 +83,9 @@ Schema. `SHOW VARIABLES` and `SHOW STATUS` also use Performance Schema in
 MySQL 9.7 and return an error in this build.
 
 The Archive, Blackhole, and Federated storage engines and the ngram
-full-text parser are omitted. MySQL 9 no longer has `mysql_native_password`.
+full-text parser are omitted. MySQL 9 no longer has `mysql_native_password`,
+and moved `MD5()`, `SHA1()` and `SHA()` to a component this build cannot load;
+`SHA2()` is available.
 
 The server is 32-bit WebAssembly, so it can use at most 4 GB of memory. It
 runs with embedded-sized buffers: a 32 MB buffer pool, 8 MB redo capacity,

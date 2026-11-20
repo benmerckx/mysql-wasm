@@ -1,0 +1,115 @@
+--- a/components/library_mysys/my_system_api/my_system_api_common.cc
++++ b/components/library_mysys/my_system_api/my_system_api_common.cc
+@@ -32,6 +32,12 @@
+   the system configuration
+ */
+ 
++#ifdef __EMSCRIPTEN__
++// The WebAssembly runtime does not expose CPU affinity or topology.
++uint32_t num_vcpus_using_affinity() { return 0; }
++uint32_t num_vcpus_using_config() { return 1; }
++#endif
++
+ uint32_t my_system_num_vcpus() {
+   uint32_t nprocs = num_vcpus_using_affinity();
+   if (nprocs == 0) {
+--- a/libs/mysql/strconv/conv/binary_basic.h
++++ b/libs/mysql/strconv/conv/binary_basic.h
+@@ -141,7 +141,7 @@ inline void decode_impl(const Binary_format &format [[maybe_unused]],
+                         Parser &parser, std::string_view &out) {
+   uint64_t size{0};
+   if (parser.read(format, size) != mysql::utils::Return_status::ok) return;
+-  if (parser.read(Fixstr_binary_format{size}, out) !=
++  if (parser.read(Fixstr_binary_format{static_cast<std::size_t>(size)}, out) !=
+       mysql::utils::Return_status::ok)
+     return;
+ }
+--- a/sql/dd_sp.cc
++++ b/sql/dd_sp.cc
+@@ -82,13 +82,15 @@ static std::vector<imported_library> get_imported_libraries(
+   for (auto &node : document.GetArray()) {
+     if (!node.HasMember("name") || !node["name"].IsString()) continue;
+     std::string_view name{node["name"].GetString(),
+-                          node["name"].GetStringLength()};
++                          static_cast<size_t>(node["name"].GetStringLength())};
+     std::string_view alias;
+     if (node.HasMember("alias") && node["alias"].IsString())
+-      alias = {node["alias"].GetString(), node["alias"].GetStringLength()};
++      alias = {node["alias"].GetString(),
++               static_cast<size_t>(node["alias"].GetStringLength())};
+     std::string_view schema;
+     if (node.HasMember("schema") && node["schema"].IsString())
+-      schema = {node["schema"].GetString(), node["schema"].GetStringLength()};
++      schema = {node["schema"].GetString(),
++                static_cast<size_t>(node["schema"].GetStringLength())};
+ 
+     result.emplace_back(
+         imported_library{std::string{schema.data(), size_t{schema.length()}},
+--- a/sql/server_component/mysql_file_imp.cc
++++ b/sql/server_component/mysql_file_imp.cc
+@@ -24,6 +24,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA */
+ #include "sql/server_component/mysql_file_imp.h"
+ 
+ #include <fcntl.h>
++#include <new>
+ #include <mysql/components/service_implementation.h>
+ #include "my_io.h"
+ #include "my_sys.h"
+--- a/sql/statement/statement.cc
++++ b/sql/statement/statement.cc
+@@ -176,6 +176,13 @@ void init_statement_handle_interface_psi_keys() {
+   destructor of this RAII class, reset query text (i.e. set query text of parent
+   query) ands end the PFS statement instrumentation.
+ */
++// The PSI_statement_info members only exist with Performance Schema.
++#ifdef HAVE_PSI_INTERFACE
++#define PSI_INFO(info) (&info)
++#else
++#define PSI_INFO(info) (nullptr)
++#endif
++
+ class PFS_instrumentation_handle_raii {
+  public:
+   PFS_instrumentation_handle_raii(THD *thd, std::string *new_query,
+@@ -345,7 +352,7 @@ bool Regular_statement_handle::execute(Server_runnable *server_runnable) {
+     bool general_log_temporarily_disabled = true;
+ 
+     PFS_instrumentation_handle_raii pfs_instr_handle_raii(
+-        m_thd, &m_query, &Regular_statement_handle::stmt_psi_info);
++        m_thd, &m_query, PSI_INFO(Regular_statement_handle::stmt_psi_info));
+     m_thd->set_query_id(next_query_id());
+ 
+     Prepared_statement stmt(m_thd);
+@@ -846,27 +853,27 @@ bool Prepared_statement_handle::internal_close() {
+ 
+ bool Prepared_statement_handle::prepare() {
+   return run([this]() { return this->internal_prepare(); },
+-             &Prepared_statement_handle::prepare_psi_info);
++             PSI_INFO(Prepared_statement_handle::prepare_psi_info));
+ }
+ 
+ bool Prepared_statement_handle::execute() {
+   return run([this]() { return this->internal_execute(); },
+-             &Prepared_statement_handle::execute_psi_info);
++             PSI_INFO(Prepared_statement_handle::execute_psi_info));
+ }
+ 
+ bool Prepared_statement_handle::fetch() {
+   return run([this]() { return this->internal_fetch(); },
+-             &Prepared_statement_handle::fetch_psi_info);
++             PSI_INFO(Prepared_statement_handle::fetch_psi_info));
+ }
+ 
+ bool Prepared_statement_handle::reset() {
+   return run([this]() { return this->internal_reset(); },
+-             &Prepared_statement_handle::reset_psi_info);
++             PSI_INFO(Prepared_statement_handle::reset_psi_info));
+ }
+ 
+ bool Prepared_statement_handle::close() {
+   return run([this]() { return this->internal_close(); },
+-             &Prepared_statement_handle::close_psi_info);
++             PSI_INFO(Prepared_statement_handle::close_psi_info));
+ }
+ 
+ template <typename Function>
