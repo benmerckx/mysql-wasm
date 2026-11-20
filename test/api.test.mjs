@@ -217,7 +217,8 @@ test('updates report matched and changed rows', async () => {
   const update = await db.query('UPDATE t SET n = 1');
   assert.equal(update.affectedRows, 2);
   assert.equal(update.changedRows, 1);
-  assert.equal((await db.query('DELETE FROM t')).changedRows, 2);
+  assert.equal((await db.query('INSERT INTO t VALUES (3, 3)')).changedRows, 0);
+  assert.equal((await db.query('DELETE FROM t')).changedRows, 0);
 });
 
 test('large values and tables survive the 32-bit build', async () => {

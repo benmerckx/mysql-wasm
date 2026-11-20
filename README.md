@@ -16,8 +16,8 @@ const { rows } = await db.sql`SELECT * FROM users WHERE id = ${insertId}`;
 - `query(sql, params?, { rowMode }?)` runs one statement and returns
   `{ rows, fields, affectedRows, changedRows, insertId }`. As in mysql2,
   `affectedRows` counts the rows an `UPDATE` matched and `changedRows` the
-  ones it changed. Parameters use MySQL's prepared-statement protocol.
-  Strings, numbers, booleans, bigints, dates,
+  ones it changed, or 0 for other statements. Parameters use MySQL's
+  prepared-statement protocol. Strings, numbers, booleans, bigints, dates,
   binary values and `null` are supported. Use one placeholder per value in an
   `IN` list. `rowMode: 'array'` returns rows as arrays, which keeps columns
   that share a name.

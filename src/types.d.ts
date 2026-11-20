@@ -26,7 +26,7 @@ export interface QueryResult<Row = Record<string, unknown>> {
   fields: Field[];
   /** Rows inserted, deleted, or matched by an UPDATE. */
   affectedRows: number;
-  /** Rows an UPDATE changed; otherwise the same as affectedRows. */
+  /** Rows an UPDATE changed; 0 for other statements, as in mysql2. */
   changedRows: number;
   /** The AUTO_INCREMENT value of the last inserted row, or 0. */
   insertId: number | bigint;

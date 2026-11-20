@@ -208,7 +208,7 @@ const st_command_service_cbs callbacks{
         const char *changed = message ? std::strstr(message, "Changed: ") : nullptr;
         cmd.result.affected = affected;
         cmd.result.insert_id = insert_id;
-        cmd.result.changed = changed ? std::strtoull(changed + 9, nullptr, 10) : affected;
+        cmd.result.changed = changed ? std::strtoull(changed + 9, nullptr, 10) : 0;
         cmd.results.push_back(std::move(cmd.result));
         cmd.result = {};
       }
