@@ -1,6 +1,6 @@
 --- a/sql/mysqld.cc
 +++ b/sql/mysqld.cc
-@@ -7831,7 +7831,9 @@
+@@ -8135,7 +8135,9 @@ static int init_server_components() {
      plugins/components.
    */
    if (!is_help_or_validate_option() && !opt_initialize) {

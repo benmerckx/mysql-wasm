@@ -1,6 +1,6 @@
 --- a/extra/zlib/CMakeLists.txt
 +++ b/extra/zlib/CMakeLists.txt
-@@ -45,4 +45,8 @@
+@@ -45,4 +45,8 @@ IF(APPLE)
    STRING_APPEND(CMAKE_C_FLAGS " -Wno-shorten-64-to-32")
  ENDIF()
  

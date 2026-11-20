@@ -1,6 +1,6 @@
 --- a/sql/CMakeLists.txt
 +++ b/sql/CMakeLists.txt
-@@ -746,6 +746,10 @@
+@@ -770,6 +770,10 @@ IF(GLOB_RECURSE_SQL_HEADERS)
      )
  ENDIF()
  
@@ -13,7 +13,7 @@
      resourcegroups/platform/thread_attrs_api_linux.cc)
 --- a/sql/mysqld.cc
 +++ b/sql/mysqld.cc
-@@ -9851,16 +9851,9 @@
+@@ -10158,16 +10158,9 @@ int mysqld_main(int argc, char **argv)
    /*
      Invoke the bootstrap thread, if required.
    */
@@ -31,7 +31,7 @@
  #endif
  
    /* Initialize command maps */
-@@ -9945,7 +9938,10 @@
+@@ -10259,7 +10252,10 @@ int mysqld_main(int argc, char **argv)
  
    (void)RUN_HOOK(server_state, before_handle_connection, (nullptr));
  
@@ -43,7 +43,7 @@
    if (mysqld_socket_acceptor != nullptr)
      mysqld_socket_acceptor->check_and_spawn_admin_connection_handler_thread();
    setup_conn_event_handler_threads();
-@@ -10030,7 +10026,11 @@
+@@ -10345,7 +10341,11 @@ int mysqld_main(int argc, char **argv)
  #endif  // _WIN32
  
    clean_up(true);

@@ -1,6 +1,6 @@
 --- a/strings/CMakeLists.txt
 +++ b/strings/CMakeLists.txt
-@@ -57,7 +57,16 @@
+@@ -57,7 +57,16 @@ SET(STRINGS_SOURCES
    xml.cc
  )
  
@@ -18,7 +18,7 @@
  
  MY_CHECK_CXX_COMPILER_WARNING("-Wmissing-profile" HAS_MISSING_PROFILE)
  IF(HAS_MISSING_PROFILE)
-@@ -71,19 +80,19 @@
+@@ -71,19 +80,19 @@ SET(JA_HANS_DST_FILE ${CMAKE_BINARY_DIR}/strings/uca900_ja_tbls.cc)
  
  ADD_CUSTOM_COMMAND(
    OUTPUT ${JA_HANS_DST_FILE}

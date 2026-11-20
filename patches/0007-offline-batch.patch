@@ -1,6 +1,6 @@
 --- a/sql/CMakeLists.txt
 +++ b/sql/CMakeLists.txt
-@@ -1123,6 +1123,13 @@
+@@ -1158,6 +1158,13 @@ MYSQL_ADD_EXECUTABLE(mysqld
    ${MYSQLD_SOURCE} DESTINATION ${INSTALL_SBINDIR} COMPONENT Server
    )
  
@@ -16,7 +16,7 @@
    SET_PROPERTY(TARGET mysqld PROPERTY JOB_POOL_LINK one_job)
 --- a/sql/mysqld.cc
 +++ b/sql/mysqld.cc
-@@ -9689,7 +9689,9 @@
+@@ -9996,7 +9996,9 @@ int mysqld_main(int argc, char **argv)
    }
  
    if (init_ssl_communication()) unireg_abort(MYSQLD_ABORT_EXIT);
@@ -26,7 +26,7 @@
  
  #ifdef _WIN32
    if (opt_require_secure_transport && !opt_enable_shared_memory &&
-@@ -9828,7 +9830,7 @@
+@@ -10135,7 +10137,7 @@ int mysqld_main(int argc, char **argv)
    if (Events::init(opt_noacl || opt_initialize))
      unireg_abort(MYSQLD_ABORT_EXIT);
  
@@ -35,7 +35,7 @@
    //  Start signal handler thread.
    start_signal_handler();
  #endif
-@@ -9847,7 +9849,17 @@
+@@ -10154,7 +10156,17 @@ int mysqld_main(int argc, char **argv)
    /*
      Invoke the bootstrap thread, if required.
    */
@@ -53,7 +53,7 @@
  
    /* Initialize command maps */
    init_command_maps();
-@@ -10347,10 +10359,14 @@
+@@ -10662,10 +10674,14 @@ static void process_bootstrap() {
      }
  
      if (error) {

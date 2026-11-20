@@ -1,6 +1,6 @@
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -1994,15 +1994,17 @@
+@@ -2037,15 +2037,17 @@ IF(WITH_AUTHENTICATION_KERBEROS)
    ENDIF()
  ENDIF()
  
@@ -27,7 +27,7 @@
  ENDIF()
  
  # Add lz4 library
-@@ -2338,7 +2340,9 @@
+@@ -2420,7 +2422,9 @@ IF(WITH_UNIT_TESTS)
    ADD_SUBDIRECTORY(unittest/mytap/t)
  ENDIF()
  

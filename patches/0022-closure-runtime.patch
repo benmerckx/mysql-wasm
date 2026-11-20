@@ -1,6 +1,6 @@
 --- a/sql/CMakeLists.txt
 +++ b/sql/CMakeLists.txt
-@@ -1140,13 +1140,17 @@
+@@ -1169,13 +1169,17 @@ IF(EMSCRIPTEN)
        -sENVIRONMENT=web,worker,node -sNODERAWFS=0 -sMODULARIZE=1 -sEXPORT_ES6=1
        -sEXPORTED_RUNTIME_METHODS=callMain,ccall,FS,ENV -sFORCE_FILESYSTEM=1
        -lidbfs.js -lnodefs.js)

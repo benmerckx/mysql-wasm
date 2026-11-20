@@ -4,6 +4,7 @@
  
  DISABLE_MISSING_PROFILE_WARNING()
  
+-ADD_SUBDIRECTORY(sys_schema)
 +IF(EMSCRIPTEN)
 +  GET_FILENAME_COMPONENT(MYSQL_WASM_HOST_BIN "${MYSQL_WASM_COMP_ERR}" DIRECTORY)
 +  SET(COMP_SQL_COMMAND "${MYSQL_WASM_HOST_BIN}/comp_sql")
@@ -14,14 +15,13 @@
 +  MYSQL_ADD_EXECUTABLE(comp_sql comp_sql.cc SKIP_INSTALL)
 +  SET(COMP_SQL_COMMAND ${COMP_SQL_COMMAND})
 +ENDIF()
-+
- ADD_SUBDIRECTORY(sys_schema)
--
+ 
 -MYSQL_ADD_EXECUTABLE(comp_sql comp_sql.cc SKIP_INSTALL)
++ADD_SUBDIRECTORY(sys_schema)
  
  # Add compiler information, for easier debugging of output from mysql_config.
  SET(COMPILER_ID_AND_VERSION
-@@ -58,12 +67,12 @@
+@@ -58,12 +67,12 @@ ENDIF()
  ADD_CUSTOM_COMMAND(
    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/mysql_fix_privilege_tables_sql.h
    ${CAT_COMMAND}
@@ -36,7 +36,7 @@
    ${CMAKE_CURRENT_SOURCE_DIR}/mysql_system_tables.sql
    ${CMAKE_CURRENT_SOURCE_DIR}/mysql_system_tables_fix.sql
  )
-@@ -76,133 +85,133 @@
+@@ -76,133 +85,133 @@ MY_ADD_CUSTOM_TARGET(GenFixPrivs
  
  ADD_CUSTOM_COMMAND(
    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/sql_commands_system_data.h
@@ -196,7 +196,7 @@
  
 --- a/scripts/sys_schema/CMakeLists.txt
 +++ b/scripts/sys_schema/CMakeLists.txt
-@@ -208,12 +208,12 @@
+@@ -209,12 +209,12 @@ MY_ADD_CUSTOM_TARGET(all_sys_schema
  
  ADD_CUSTOM_COMMAND(
    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/sql_commands.h
@@ -211,7 +211,7 @@
    ${CMAKE_CURRENT_BINARY_DIR}/ALL_SYS_SCHEMA.sql
    VERBATIM
  )
-@@ -223,7 +223,7 @@
+@@ -224,7 +224,7 @@ MY_ADD_CUSTOM_TARGET(sql_commands
  
  MY_ADD_CUSTOM_TARGET(GenSysSchemaC
    ALL

@@ -1,9 +1,9 @@
 --- a/sql/resourcegroups/platform/thread_attrs_api_common.cc
 +++ b/sql/resourcegroups/platform/thread_attrs_api_common.cc
-@@ -27,6 +27,26 @@
+@@ -26,6 +26,24 @@
+ #include "sql/resourcegroups/platform/thread_attrs_api.h"
  
- namespace resourcegroups {
- namespace platform {
+ namespace resourcegroups::platform {
 +
 +#ifdef __EMSCRIPTEN__
 +// The WebAssembly runtime manages worker scheduling and affinity.
@@ -20,8 +20,6 @@
 +int thread_priority(my_thread_os_id_t) { return 0; }
 +bool set_thread_priority(int) { return true; }
 +bool set_thread_priority(int, my_thread_os_id_t) { return true; }
-+uint32_t num_vcpus_using_affinity() { return 0; }
-+uint32_t num_vcpus_using_config() { return 1; }
 +#endif
 +
  bool is_valid_thread_priority(int priority) {

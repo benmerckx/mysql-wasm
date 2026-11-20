@@ -1,6 +1,6 @@
 --- a/storage/innobase/include/os0atomic.h
 +++ b/storage/innobase/include/os0atomic.h
-@@ -43,7 +43,7 @@
+@@ -43,7 +43,7 @@ this program; if not, write to the Free Software Foundation, Inc.,
  #include "univ.i"
  
  /** barrier definitions for memory ordering */

@@ -1,6 +1,16 @@
+--- a/config.h.cmake
++++ b/config.h.cmake
+@@ -140,6 +140,7 @@
+ #cmakedefine HAVE_SETNS 1
+ #cmakedefine HAVE_KQUEUE_TIMERS 1
+ #cmakedefine HAVE_POSIX_TIMERS 1
++#cmakedefine HAVE_EMSCRIPTEN_TIMERS 1
+ 
+ /* Endianess */
+ #cmakedefine WORDS_BIGENDIAN 1
 --- a/configure.cmake
 +++ b/configure.cmake
-@@ -333,7 +333,11 @@
+@@ -333,7 +333,11 @@ ELSEIF(HAVE_TIMER_CREATE AND HAVE_TIMER_SETTIME)
    SET(HAVE_POSIX_TIMERS 1 CACHE INTERNAL "Have POSIX timer-related functions")
  ENDIF()
  
@@ -13,19 +23,9 @@
    MESSAGE(FATAL_ERROR "No mysys timer support detected!")
  ENDIF()
  
---- a/config.h.cmake
-+++ b/config.h.cmake
-@@ -140,6 +140,7 @@
- #cmakedefine HAVE_SETNS 1
- #cmakedefine HAVE_KQUEUE_TIMERS 1
- #cmakedefine HAVE_POSIX_TIMERS 1
-+#cmakedefine HAVE_EMSCRIPTEN_TIMERS 1
- 
- /* Endianess */
- #cmakedefine WORDS_BIGENDIAN 1
 --- a/include/my_timer.h
 +++ b/include/my_timer.h
-@@ -39,6 +39,8 @@
+@@ -39,6 +39,8 @@ typedef timer_t os_timer_t;
  #include <sys/types.h> /* uintptr_t */
  
  typedef uintptr_t os_timer_t;
@@ -36,7 +36,7 @@
    HANDLE timer_handle;
 --- a/mysys/CMakeLists.txt
 +++ b/mysys/CMakeLists.txt
-@@ -168,7 +168,9 @@
+@@ -168,7 +168,9 @@ IF(HAVE_BUILD_ID_SUPPORT)
    LIST(APPEND MYSYS_SOURCES build_id.cc)
  ENDIF()
  

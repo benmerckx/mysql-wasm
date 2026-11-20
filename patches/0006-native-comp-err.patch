@@ -1,11 +1,9 @@
 --- a/utilities/CMakeLists.txt
 +++ b/utilities/CMakeLists.txt
-@@ -28,6 +28,15 @@
- IF(NOT WITH_DEBUG)
-   # the innodb parts are documented assuming WITH_DEBUG (UNIV_DEBUG)
+@@ -30,6 +30,15 @@ IF(NOT WITH_DEBUG)
    DISABLE_DOCUMENTATION_WARNINGS()
-+ENDIF()
-+
+ ENDIF()
+ 
 +IF(EMSCRIPTEN)
 +  IF(NOT EXISTS "${MYSQL_WASM_COMP_ERR}")
 +    MESSAGE(FATAL_ERROR "Set MYSQL_WASM_COMP_ERR to the native comp_err executable.")
@@ -13,15 +11,17 @@
 +  SET(COMP_ERR_COMMAND "${MYSQL_WASM_COMP_ERR}")
 +ELSE()
 +  SET(COMP_ERR_COMMAND comp_err)
- ENDIF()
- 
++ENDIF()
++
  IF(NOT CMAKE_CROSSCOMPILING)
-@@ -75,7 +84,7 @@
+   MYSQL_ADD_EXECUTABLE(comp_err
+     comp_err.cc
+@@ -75,7 +84,7 @@ ADD_CUSTOM_COMMAND(OUTPUT
    ${PROJECT_BINARY_DIR}/include/mysqld_ername.h
    ${PROJECT_BINARY_DIR}/include/mysqld_errmsg.h
    ${PROJECT_BINARY_DIR}/${INSTALL_MYSQLSHAREDIR}/english/errmsg.sys
 -  COMMAND comp_err
 +  COMMAND ${COMP_ERR_COMMAND}
-   --charset=${PROJECT_SOURCE_DIR}/share/charsets
    --out-dir=${PROJECT_BINARY_DIR}/${INSTALL_MYSQLSHAREDIR}/
    --header_file=${PROJECT_BINARY_DIR}/include/mysqld_error.h
+   --name_file=${PROJECT_BINARY_DIR}/include/mysqld_ername.h

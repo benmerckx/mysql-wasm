@@ -1,6 +1,6 @@
 --- a/sql/CMakeLists.txt
 +++ b/sql/CMakeLists.txt
-@@ -1124,8 +1124,20 @@
+@@ -1163,8 +1163,20 @@ MYSQL_ADD_EXECUTABLE(mysqld
    )
  
  IF(EMSCRIPTEN)

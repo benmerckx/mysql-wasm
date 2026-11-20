@@ -1,6 +1,6 @@
 # mysql-wasm
 
-MySQL Community Server 8.4 compiled to WebAssembly, with an async JavaScript
+MySQL Community Server 9.7 compiled to WebAssembly, with an async JavaScript
 API for Node.js and browsers. Node runs the server in the current process, on
 worker threads. Browsers run it in a dedicated worker.
 
@@ -80,10 +80,10 @@ sentence, and title break rules and locale overrides unused by the regex engine.
 Performance Schema and its instrumentation are omitted. New data directories
 skip the bundled `sys` schema, whose diagnostic views depend on Performance
 Schema. `SHOW VARIABLES` and `SHOW STATUS` also use Performance Schema in
-MySQL 8.4 and return an error in this build.
+MySQL 9.7 and return an error in this build.
 
-The Archive, Blackhole, and Federated storage engines are omitted, along with
-the ngram full-text parser and the legacy `mysql_native_password` plugin.
+The Archive, Blackhole, and Federated storage engines and the ngram
+full-text parser are omitted. MySQL 9 no longer has `mysql_native_password`.
 
 The server is 32-bit WebAssembly, so it can use at most 4 GB of memory. It
 runs with embedded-sized buffers: a 32 MB buffer pool, 8 MB redo capacity,
@@ -108,7 +108,7 @@ Network client connections are outside the current JavaScript API.
 ## Upstream source
 
 The `upstream/mysql-server` Git submodule pins the official
-[MySQL 8.4.13 LTS tag](https://github.com/mysql/mysql-server/tree/mysql-8.4.13).
+[MySQL 9.7.4 LTS tag](https://github.com/mysql/mysql-server/tree/mysql-9.7.4).
 After cloning this repository, initialize the pinned checkout:
 
 ```sh
@@ -153,5 +153,5 @@ data directory. The low-level `./scripts/smoke-innodb` test uses the staged Node
 ### WASIX
 
 `./scripts/configure-wasix` preserves the baseline probe for wasixcc 0.4.7,
-which does not apply the patches. MySQL 8.4 only accepts 64-bit pointers;
+which does not apply the patches. MySQL 9.7 only accepts 64-bit pointers;
 the Emscripten build lifts that check and targets wasm32 with `-pthread`.

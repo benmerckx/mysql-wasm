@@ -11,7 +11,7 @@ test('MySQLProcess uses native parameters, executes scripts and persists InnoDB 
   let db;
   try {
     db = await MySQLProcess.create({ dataDir });
-    assert.equal((await db.query('SELECT VERSION() AS version')).rows[0].version, '8.4.13');
+    assert.equal((await db.query('SELECT VERSION() AS version')).rows[0].version, '9.7.4');
     const [ddl, write, select] = await db.exec(
       "CREATE TABLE records (id BIGINT PRIMARY KEY, value VARCHAR(128)) ENGINE=InnoDB; INSERT INTO records VALUES (1,'kept'); SELECT id FROM records;",
     );

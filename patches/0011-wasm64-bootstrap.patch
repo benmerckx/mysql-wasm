@@ -1,6 +1,6 @@
 --- a/sql/set_var.cc
 +++ b/sql/set_var.cc
-@@ -481,7 +481,7 @@
+@@ -481,7 +481,7 @@ void sys_var::set_user_host(THD *thd) {
  void sys_var::do_deprecated_warning(THD *thd) {
    if (deprecation_substitute != nullptr) {
      char buf1[NAME_CHAR_LEN + 3];
@@ -11,7 +11,7 @@
         if deprecation_substitute is an empty string,
 --- a/sql/sql_initialize.cc
 +++ b/sql/sql_initialize.cc
-@@ -262,7 +262,7 @@
+@@ -261,7 +261,7 @@ bool initialize_create_data_directory(const char *data_home) {
               ER_INIT_DATADIR_EXISTS_AND_PATH_TOO_LONG_WONT_INITIALIZE);
        return true; /* purecov: inspected */
      }
