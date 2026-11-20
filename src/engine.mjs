@@ -9,6 +9,8 @@ const args = [
   ...serverOptions,
 ];
 
+const chunk = 1 << 16;
+
 function createRuntime(createEngine, locateFile) {
   const ready = Promise.withResolvers();
   const exited = Promise.withResolvers();
@@ -67,7 +69,10 @@ function createRuntime(createEngine, locateFile) {
       const instance = await module;
       const request = Promise.withResolvers();
       pending.push(request);
-      instance.ccall('mysql_wasm_submit', null, ['string'], [frame]);
+      // ccall copies strings onto the wasm stack, so large frames go in
+      // slices. Frames are ASCII and the session buffers until a newline.
+      for (let i = 0; i < frame.length; i += chunk)
+        instance.ccall('mysql_wasm_submit', null, ['string'], [frame.slice(i, i + chunk)]);
       return request.promise;
     },
   };

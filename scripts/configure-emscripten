@@ -7,7 +7,7 @@ if ! command -v emcmake >/dev/null 2>&1; then
   exit 1
 fi
 
-ssl="${OPENSSL_WASM64_ROOT:-$root/build/openssl-wasm64}"
+ssl="${OPENSSL_WASM_ROOT:-$root/build/openssl-wasm32}"
 comp_err="${MYSQL_WASM_COMP_ERR:-$root/build/native/runtime_output_directory/comp_err}"
 if [[ ! -f "$ssl/lib/libssl_stubs.a" || ! -f "$ssl/lib/libcrypto.a" || ! -x "$comp_err" ||
       ! -x "$(dirname "$comp_err")/uca9dump" ||
@@ -23,8 +23,8 @@ mkdir -p "$build_dir"
 printf '{"type":"commonjs"}\n' > "$build_dir/package.json"
 exec emcmake cmake -S "$source_dir" -B "$build_dir" -G Ninja \
   -DCMAKE_BUILD_TYPE=Release \
-  -DCMAKE_C_FLAGS="-m64 -pthread" \
-  -DCMAKE_CXX_FLAGS="-m64 -pthread -fwasm-exceptions" \
+  -DCMAKE_C_FLAGS="-pthread" \
+  -DCMAKE_CXX_FLAGS="-pthread -fwasm-exceptions" \
   -DCMAKE_C_FLAGS_RELEASE="-Oz -DNDEBUG" \
   -DCMAKE_CXX_FLAGS_RELEASE="-Oz -DNDEBUG" \
   -DMYSQL_WASM_COMP_ERR="$comp_err" \

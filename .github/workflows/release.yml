@@ -69,10 +69,13 @@ jobs:
           ./scripts/build-dependencies
           ./scripts/build-emscripten
 
+      - uses: oven-sh/setup-bun@v2
+
       - name: Test
         run: |
           npm ci
           npm test
+          bun test --timeout 300000 test/api.test.mjs
           ./scripts/smoke-innodb
 
       - name: Pack

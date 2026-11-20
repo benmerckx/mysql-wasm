@@ -41,23 +41,21 @@ safe integer range, and `insertId` beyond it, are bigints, as in PGlite.
 `DECIMAL` and date and time values are strings, JSON columns are parsed,
 and binary strings are `Uint8Array`s. `types` names the `Field.type` codes.
 
-The server needs WebAssembly Memory64: Node.js 24 or later, or a recent
-Chrome or Firefox. Bun does not support it yet. Node can use a filesystem
-path or `file://` URL for `dataDir`. Browsers accept `idb://name` and save
-writes to IndexedDB shortly after each query. Omit `dataDir` or use `memory://` for temporary storage.
+Node.js 24 or later and Bun can use a filesystem path or `file://` URL for
+`dataDir`. Browsers accept `idb://name` and save writes to IndexedDB shortly
+after each query. Omit `dataDir` or use `memory://` for temporary storage.
 Only one connection may open a given persistent data directory at a time; a
-lock left by a crashed Node process is taken over. Snapshots and the prebuilt
+lock left by a crashed process is taken over. Snapshots and the prebuilt
 data directory use `lower_case_table_names=0`, so on a case-insensitive disk,
 such as most macOS volumes, load them into memory or IndexedDB instead.
 
-In Node, `MySQLProcess` from `mysql-wasm/process` runs the server in a child
+In Node and Bun, `MySQLProcess` from `mysql-wasm/process` runs the server in a child
 process instead, so a crash in the server cannot take the host down. It has
 the same API except `dump()`, and both open each other's data directories.
 
 ## Browser setup
 
 Host the site with cross-origin isolation for WebAssembly threads.
-Use a browser with WebAssembly Memory64 support.
 
 ```text
 Cross-Origin-Opener-Policy: same-origin
@@ -87,8 +85,9 @@ MySQL 8.4 and return an error in this build.
 The Archive, Blackhole, and Federated storage engines are omitted, along with
 the ngram full-text parser and the legacy `mysql_native_password` plugin.
 
-The server runs with embedded-sized buffers: a 32 MB buffer pool, 8 MB redo
-capacity, 1 MB log buffer, and 64 MB of TempTable memory. TLS is not built:
+The server is 32-bit WebAssembly, so it can use at most 4 GB of memory. It
+runs with embedded-sized buffers: a 32 MB buffer pool, 8 MB redo capacity,
+1 MB log buffer, and 64 MB of TempTable memory. TLS is not built:
 the server links stubs instead of OpenSSL's libssl and generates no
 certificates or RSA keys. OpenSSL's libcrypto still provides hashing, AES and
 random bytes, built without unused algorithms such as DES, DSA, RC4 and SM2.
@@ -141,7 +140,7 @@ npm test
 npm pack --pack-destination dist
 ```
 
-The build uses native code generators and static wasm64 OpenSSL. The
+The build uses native code generators and static wasm32 OpenSSL. The
 Node and browser loaders share one WASM binary and one runtime data bundle
 containing MySQL error messages, charset definitions, and ICU data. The
 patches apply to a generated checkout under `build/sources/`, keeping the
@@ -153,6 +152,6 @@ data directory. The low-level `./scripts/smoke-innodb` test uses the staged Node
 
 ### WASIX
 
-`./scripts/configure-wasix` preserves the baseline probe. wasixcc 0.4.7
-targets wasm32, which MySQL 8.4 rejects because it requires 64-bit pointers.
-The Emscripten build uses `-m64 -pthread`.
+`./scripts/configure-wasix` preserves the baseline probe for wasixcc 0.4.7,
+which does not apply the patches. MySQL 8.4 only accepts 64-bit pointers;
+the Emscripten build lifts that check and targets wasm32 with `-pthread`.

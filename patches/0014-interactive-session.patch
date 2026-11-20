@@ -18,7 +18,7 @@
      Invoke the bootstrap thread, if required.
    */
 -#ifdef __EMSCRIPTEN__
--  // The wasm64 CLI runs initialization or a single SQL batch offline.
+-  // The Node CLI runs initialization or a single SQL batch offline.
 -  if (!opt_initialize && (!opt_init_file || !*opt_init_file)) {
 -    fprintf(stderr, "The WASM server requires --initialize-insecure or --init-file.\n");
 -    unireg_abort(MYSQLD_ABORT_EXIT);

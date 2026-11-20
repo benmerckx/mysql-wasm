@@ -15,7 +15,7 @@ fi
 jobs="${JOBS:-4}"
 native="$root/build/native"
 openssl="$root/build/openssl"
-prefix="$root/build/openssl-wasm64"
+prefix="$root/build/openssl-wasm32"
 
 cmake -S "$upstream" -B "$native" -G Ninja \
   -DCMAKE_BUILD_TYPE=Release \
@@ -30,7 +30,7 @@ cd "$openssl"
 # Only libcrypto is linked, for hashing, AES and random bytes. The default
 # provider registers every algorithm it is built with, so unused ones go.
 options=(
-  -Oz -m64 -pthread no-asm no-shared no-tests no-module no-dso no-apps
+  -Oz -pthread no-asm no-shared no-tests no-module no-dso no-apps
   no-async no-afalgeng no-ktls no-quic no-err no-engine no-comp no-ocsp
   no-cms no-ts no-srp no-ct no-cmp no-dtls no-srtp no-ssl3 no-tls1 no-tls1_1
   no-psk no-idea no-camellia no-seed no-rc2 no-rc4 no-rc5 no-md4 no-mdc2
@@ -43,14 +43,14 @@ stamp="$openssl/.mysql-wasm-options"
 if [[ -f Makefile && "$(cat "$stamp" 2>/dev/null)" != "${options[*]}" ]]; then
   make clean
 fi
-CC=emcc CXX=em++ AR=emar RANLIB=emranlib ./Configure linux-generic64 \
+CC=emcc CXX=em++ AR=emar RANLIB=emranlib ./Configure linux-generic32 \
   "${options[@]}" --prefix="$prefix" --libdir=lib
 printf '%s' "${options[*]}" > "$stamp"
 make -j"$jobs" build_sw
 make install_sw
 
 # The server's remaining TLS calls link against stubs instead of libssl.
-emcc -Oz -m64 -pthread -Wall -Wno-unused-parameter -Werror \
+emcc -Oz -pthread -Wall -Wno-unused-parameter -Werror \
   -I"$prefix/include" -c "$root/port/ssl_stubs.c" -o "$prefix/lib/ssl_stubs.o"
 rm -f "$prefix/lib/libssl_stubs.a"
 emar rcs "$prefix/lib/libssl_stubs.a" "$prefix/lib/ssl_stubs.o"

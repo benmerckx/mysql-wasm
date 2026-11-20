@@ -219,3 +219,21 @@ test('updates report matched and changed rows', async () => {
   assert.equal(update.changedRows, 1);
   assert.equal((await db.query('DELETE FROM t')).changedRows, 2);
 });
+
+test('large values and tables survive the 32-bit build', async () => {
+  await using db = await MySQL.create();
+  const blob = new Uint8Array(16 << 20).map((_, i) => i * 31);
+  await db.exec('CREATE TABLE big (id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY, data LONGBLOB)');
+  await db.query('INSERT INTO big VALUES (?, ?)', [2n ** 63n, blob]);
+  const { rows: [row] } = await db.query('SELECT id, data, LENGTH(data) AS size FROM big');
+  assert.equal(row.id, 2n ** 63n);
+  assert.equal(row.size, blob.length);
+  assert.ok(Buffer.from(row.data).equals(blob));
+  assert.equal((await db.query('INSERT INTO big (data) VALUES (NULL)')).insertId, 2n ** 63n + 1n);
+  await db.exec(`SET cte_max_recursion_depth = 300000;
+    CREATE TABLE n (i INT PRIMARY KEY, v BIGINT);
+    INSERT INTO n WITH RECURSIVE s (i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM s WHERE i < 300000)
+      SELECT i, i * 4294967296 FROM s`);
+  const { rows: [sum] } = await db.query('SELECT COUNT(*) AS c, SUM(v) AS s, MAX(v) AS m FROM n');
+  assert.deepEqual(sum, { c: 300000, s: String(300000n * 300001n / 2n * 4294967296n), m: 300000 * 4294967296 });
+});

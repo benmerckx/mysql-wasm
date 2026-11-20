@@ -6,18 +6,25 @@ source_dir="${MYSQL_WASM_SOURCE_DIR:-$("$root/scripts/prepare-source")}"
 build_dir="${MYSQL_WASM_BUILD_DIR:-$root/build/emscripten/$(basename "$source_dir")}"
 dist="$root/dist"
 
+# Bun gives worker threads a web postMessage, so Emscripten skips the shim
+# that delivers parentPort messages and its threads never start.
+stage_js() {
+  perl -0pe 's/globalThis\.postMessage\|\|\(/(/ or die "Missing the pthread message shim\n"' \
+    "$build_dir/runtime_output_directory/mysqld.js" > "$1/mysqld.js"
+}
+
 if [[ "${1:-}" == --browser ]]; then
   mkdir -p "$dist/browser"
   if ! cmp -s "$build_dir/runtime_output_directory/mysqld.wasm" "$dist/mysqld.wasm"; then
     echo 'Stage the matching Node build before the browser build.' >&2
     exit 1
   fi
-  cp "$build_dir/runtime_output_directory/mysqld.js" "$dist/browser/"
+  stage_js "$dist/browser"
   exit
 fi
 
 mkdir -p "$dist/runtime_output_directory" "$dist/share/english" "$dist/lib/private"
-cp "$build_dir/runtime_output_directory/mysqld.js" "$dist/runtime_output_directory/"
+stage_js "$dist/runtime_output_directory"
 cp "$build_dir/runtime_output_directory/mysqld.wasm" "$dist/"
 printf '{"type":"commonjs"}\n' > "$dist/runtime_output_directory/package.json"
 cp "$build_dir/share/english/errmsg.sys" "$dist/share/english/"

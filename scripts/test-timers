@@ -5,7 +5,7 @@ root="$(cd "$(dirname "$0")/.." && pwd)"
 build_dir="$root/build/timer-test"
 mkdir -p "$build_dir"
 printf '#define HAVE_EMSCRIPTEN_TIMERS 1\n' > "$build_dir/my_config.h"
-em++ -m64 -pthread -fwasm-exceptions -sPTHREAD_POOL_SIZE=1 \
+em++ -pthread -fwasm-exceptions -sPTHREAD_POOL_SIZE=1 \
   -I"$build_dir" -I"$root/upstream/mysql-server/include" \
   "$root/port/emscripten_timers.cc" "$root/test/timers.cc" \
   -o "$build_dir/test.js"

@@ -1,0 +1,11 @@
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -694,6 +694,7 @@
+ # On some platforms, cmake may think that CMAKE_SIZEOF_VOID_P == 4
+ # even if we have configured for 64bit build....
+ SET(CMAKE_SIZEOF_VOID_P ${SIZEOF_VOIDP})
+-IF(NOT SIZEOF_VOIDP EQUAL 8)
++# wasm32 is faster, smaller and more widely supported than Memory64.
++IF(NOT SIZEOF_VOIDP EQUAL 8 AND NOT EMSCRIPTEN)
+   MESSAGE(FATAL_ERROR "MySQL supports only 64-bit platforms.")
+ ENDIF()
